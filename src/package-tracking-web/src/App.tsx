@@ -34,8 +34,16 @@ const statusNames = [
 function App() {
   const [trackingNumber, setTrackingNumber] = useState("");
   const [shipment, setShipment] = useState<Shipment | null>(null);
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [trackingError, setTrackingError] = useState("");
+  const [isTracking, setIsTracking] = useState(false);
+
+  const [senderName, setSenderName] = useState("");
+  const [recipientName, setRecipientName] = useState("");
+  const [origin, setOrigin] = useState("");
+  const [destination, setDestination] = useState("");
+  const [createError, setCreateError] = useState("");
+  const [createdTrackingNumber, setCreatedTrackingNumber] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
 
   async function trackShipment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -43,13 +51,13 @@ function App() {
     const cleanedTrackingNumber = trackingNumber.trim();
 
     if (!cleanedTrackingNumber) {
-      setError("Please enter a tracking number.");
+      setTrackingError("Please enter a tracking number.");
       setShipment(null);
       return;
     }
 
-    setIsLoading(true);
-    setError("");
+    setIsTracking(true);
+    setTrackingError("");
     setShipment(null);
 
     try {
@@ -75,9 +83,68 @@ function App() {
           ? requestError.message
           : "An unexpected error occurred.";
 
-      setError(message);
+      setTrackingError(message);
     } finally {
-      setIsLoading(false);
+      setIsTracking(false);
+    }
+  }
+
+  async function createShipment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (
+      !senderName.trim() ||
+      !recipientName.trim() ||
+      !origin.trim() ||
+      !destination.trim()
+    ) {
+      setCreateError("Please complete every field.");
+      return;
+    }
+
+    setIsCreating(true);
+    setCreateError("");
+    setCreatedTrackingNumber("");
+
+    try {
+      const response = await fetch(
+        "http://localhost:5133/api/shipments",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            senderName: senderName.trim(),
+            recipientName: recipientName.trim(),
+            origin: origin.trim(),
+            destination: destination.trim(),
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("The shipment could not be created.");
+      }
+
+      const createdShipment: Shipment = await response.json();
+
+      setCreatedTrackingNumber(createdShipment.trackingNumber);
+      setTrackingNumber(createdShipment.trackingNumber);
+
+      setSenderName("");
+      setRecipientName("");
+      setOrigin("");
+      setDestination("");
+    } catch (requestError) {
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "An unexpected error occurred.";
+
+      setCreateError(message);
+    } finally {
+      setIsCreating(false);
     }
   }
 
@@ -92,8 +159,8 @@ function App() {
         <h1>Track your shipment</h1>
 
         <p className="subtitle">
-          Enter your tracking number to view the current status and delivery
-          history.
+          Enter your tracking number to view the current status and complete
+          delivery history.
         </p>
 
         <form className="tracking-form" onSubmit={trackShipment}>
@@ -105,12 +172,14 @@ function App() {
             aria-label="Tracking number"
           />
 
-          <button type="submit" disabled={isLoading}>
-            {isLoading ? "Searching..." : "Track Package"}
+          <button type="submit" disabled={isTracking}>
+            {isTracking ? "Searching..." : "Track Package"}
           </button>
         </form>
 
-        {error && <p className="error-message">{error}</p>}
+        {trackingError && (
+          <p className="error-message">{trackingError}</p>
+        )}
       </section>
 
       {shipment && (
@@ -156,7 +225,10 @@ function App() {
             ) : (
               <div className="timeline">
                 {shipment.trackingHistory.map((trackingEvent) => (
-                  <article className="timeline-item" key={trackingEvent.id}>
+                  <article
+                    className="timeline-item"
+                    key={trackingEvent.id}
+                  >
                     <div className="timeline-dot" />
 
                     <div>
@@ -182,6 +254,72 @@ function App() {
           </div>
         </section>
       )}
+
+      <section className="create-section">
+        <div className="section-heading">
+          <p className="eyebrow">Shipment Management</p>
+          <h2>Create a new shipment</h2>
+          <p>
+            Enter the sender, recipient, origin, and destination information.
+          </p>
+        </div>
+
+        <form className="create-form" onSubmit={createShipment}>
+          <label>
+            Sender name
+            <input
+              type="text"
+              value={senderName}
+              onChange={(event) => setSenderName(event.target.value)}
+              placeholder="Enter sender name"
+            />
+          </label>
+
+          <label>
+            Recipient name
+            <input
+              type="text"
+              value={recipientName}
+              onChange={(event) => setRecipientName(event.target.value)}
+              placeholder="Enter recipient name"
+            />
+          </label>
+
+          <label>
+            Origin
+            <input
+              type="text"
+              value={origin}
+              onChange={(event) => setOrigin(event.target.value)}
+              placeholder="Example: Detroit, Michigan"
+            />
+          </label>
+
+          <label>
+            Destination
+            <input
+              type="text"
+              value={destination}
+              onChange={(event) => setDestination(event.target.value)}
+              placeholder="Example: Chicago, Illinois"
+            />
+          </label>
+
+          <button type="submit" disabled={isCreating}>
+            {isCreating ? "Creating..." : "Create Shipment"}
+          </button>
+        </form>
+
+        {createError && <p className="error-message">{createError}</p>}
+
+        {createdTrackingNumber && (
+          <div className="success-message">
+            <strong>Shipment created successfully!</strong>
+            <p>Your tracking number is:</p>
+            <code>{createdTrackingNumber}</code>
+          </div>
+        )}
+      </section>
     </main>
   );
 }
