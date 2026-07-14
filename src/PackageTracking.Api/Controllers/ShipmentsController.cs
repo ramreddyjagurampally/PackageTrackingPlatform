@@ -34,6 +34,7 @@ public sealed class ShipmentsController : ControllerBase
     {
         var shipment = await _dbContext.Shipments
             .AsNoTracking()
+            .Include(shipment => shipment.TrackingHistory)
             .FirstOrDefaultAsync(shipment =>
                 shipment.TrackingNumber == trackingNumber);
 
@@ -44,6 +45,11 @@ public sealed class ShipmentsController : ControllerBase
                 message = "Shipment not found."
             });
         }
+
+        shipment.TrackingHistory = shipment.TrackingHistory
+            .OrderByDescending(trackingEvent =>
+                trackingEvent.OccurredAtUtc)
+            .ToList();
 
         return Ok(shipment);
     }
@@ -64,6 +70,17 @@ public sealed class ShipmentsController : ControllerBase
         _dbContext.Shipments.Add(shipment);
         await _dbContext.SaveChangesAsync();
 
+        var trackingEvent = new ShipmentTrackingEvent
+        {
+            ShipmentId = shipment.Id,
+            Status = ShipmentStatus.Created,
+            Location = request.Origin,
+            Description = "Shipment was created."
+        };
+
+        _dbContext.ShipmentTrackingEvents.Add(trackingEvent);
+        await _dbContext.SaveChangesAsync();
+
         return CreatedAtAction(
             nameof(GetByTrackingNumber),
             new { trackingNumber = shipment.TrackingNumber },
@@ -71,7 +88,7 @@ public sealed class ShipmentsController : ControllerBase
     }
 
     [HttpPut("{trackingNumber}/status")]
-    public async Task<ActionResult<Shipment>> UpdateStatus(
+    public async Task<ActionResult> UpdateStatus(
         string trackingNumber,
         UpdateShipmentStatusRequest request)
     {
@@ -95,7 +112,9 @@ public sealed class ShipmentsController : ControllerBase
             });
         }
 
-        if (!Enum.IsDefined(request.Status.Value))
+        var newStatus = request.Status.Value;
+
+        if (!Enum.IsDefined(newStatus))
         {
             return BadRequest(new
             {
@@ -103,11 +122,27 @@ public sealed class ShipmentsController : ControllerBase
             });
         }
 
-        shipment.CurrentStatus = request.Status.Value;
+        shipment.CurrentStatus = newStatus;
+
+        var trackingEvent = new ShipmentTrackingEvent
+        {
+            ShipmentId = shipment.Id,
+            Status = newStatus,
+            Location = request.Location,
+            Description = request.Description
+        };
+
+        _dbContext.ShipmentTrackingEvents.Add(trackingEvent);
 
         await _dbContext.SaveChangesAsync();
 
-        return Ok(shipment);
+        return Ok(new
+        {
+            shipment.Id,
+            shipment.TrackingNumber,
+            shipment.CurrentStatus,
+            TrackingEvent = trackingEvent
+        });
     }
 
     private static string GenerateTrackingNumber()

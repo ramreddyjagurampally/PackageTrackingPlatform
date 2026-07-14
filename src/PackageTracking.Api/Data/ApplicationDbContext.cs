@@ -12,4 +12,7 @@ public sealed class ApplicationDbContext : DbContext
     }
 
     public DbSet<Shipment> Shipments => Set<Shipment>();
+
+    public DbSet<ShipmentTrackingEvent> ShipmentTrackingEvents =>
+        Set<ShipmentTrackingEvent>();
 }

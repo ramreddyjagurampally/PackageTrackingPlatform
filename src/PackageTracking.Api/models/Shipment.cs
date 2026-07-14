@@ -18,4 +18,10 @@ public sealed class Shipment
         ShipmentStatus.Created;
 
     public DateTime CreatedAtUtc { get; init; } = DateTime.UtcNow;
+
+    public ICollection<ShipmentTrackingEvent> TrackingHistory { get; set; } =
+        new List<ShipmentTrackingEvent>();
 }
+
+
+  
