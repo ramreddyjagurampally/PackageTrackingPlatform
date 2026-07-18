@@ -24,8 +24,6 @@ public sealed class ShipmentsController : ControllerBase
         _afterShipTrackingService = afterShipTrackingService;
     }
 
-    // Employee/Admin only:
-    // GET api/shipments
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Shipment>>> GetAll()
     {
@@ -37,8 +35,6 @@ public sealed class ShipmentsController : ControllerBase
         return Ok(shipments);
     }
 
-    // Public:
-    // GET api/shipments/{trackingNumber}
     [AllowAnonymous]
     [HttpGet("{trackingNumber}")]
     public async Task<ActionResult<Shipment>> GetByTrackingNumber(
@@ -76,16 +72,19 @@ public sealed class ShipmentsController : ControllerBase
         return Ok(shipment);
     }
 
-    // Employee/Admin only:
-    // POST api/shipments
     [HttpPost]
     public async Task<ActionResult<Shipment>> Create(
         CreateShipmentRequest request)
     {
-        var senderName = request.SenderName?.Trim() ?? string.Empty;
+        var senderName =
+            request.SenderName?.Trim() ?? string.Empty;
+
         var recipientName =
             request.RecipientName?.Trim() ?? string.Empty;
-        var origin = request.Origin?.Trim() ?? string.Empty;
+
+        var origin =
+            request.Origin?.Trim() ?? string.Empty;
+
         var destination =
             request.Destination?.Trim() ?? string.Empty;
 
@@ -98,6 +97,27 @@ public sealed class ShipmentsController : ControllerBase
             {
                 message =
                     "Sender, recipient, origin, and destination are required."
+            });
+        }
+
+        if (request.WeightKg <= 0 ||
+            request.LengthCm <= 0 ||
+            request.WidthCm <= 0 ||
+            request.HeightCm <= 0)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Package weight and dimensions must be greater than zero."
+            });
+        }
+
+        if (!request.ServiceLevel.HasValue ||
+            !Enum.IsDefined(request.ServiceLevel.Value))
+        {
+            return BadRequest(new
+            {
+                message = "A valid service level is required."
             });
         }
 
@@ -117,6 +137,9 @@ public sealed class ShipmentsController : ControllerBase
             });
         }
 
+        var serviceLevel = request.ServiceLevel.Value;
+        var createdAtUtc = DateTime.UtcNow;
+
         var shipment = new Shipment
         {
             TrackingNumber = GenerateTrackingNumber(),
@@ -124,6 +147,31 @@ public sealed class ShipmentsController : ControllerBase
             RecipientName = recipientName,
             Origin = origin,
             Destination = destination,
+            CurrentStatus = ShipmentStatus.Created,
+
+            WeightKg = request.WeightKg,
+            LengthCm = request.LengthCm,
+            WidthCm = request.WidthCm,
+            HeightCm = request.HeightCm,
+
+            ServiceLevel = serviceLevel,
+
+            EstimatedDeliveryDateUtc =
+                CalculateEstimatedDeliveryDate(
+                    createdAtUtc,
+                    serviceLevel),
+
+            ShippingCost =
+                CalculateShippingCost(
+                    request.WeightKg,
+                    request.LengthCm,
+                    request.WidthCm,
+                    request.HeightCm,
+                    serviceLevel),
+
+            DeliveryInstructions =
+                request.DeliveryInstructions?.Trim()
+                ?? string.Empty,
 
             CarrierSlug = hasCarrierSlug
                 ? request.CarrierSlug!
@@ -138,9 +186,7 @@ public sealed class ShipmentsController : ControllerBase
 
             UsesCarrierTracking =
                 hasCarrierSlug &&
-                hasCarrierTrackingNumber,
-
-            CurrentStatus = ShipmentStatus.Created
+                hasCarrierTrackingNumber
         };
 
         _dbContext.Shipments.Add(shipment);
@@ -151,9 +197,9 @@ public sealed class ShipmentsController : ControllerBase
             ShipmentId = shipment.Id,
             Status = ShipmentStatus.Created,
             Location = shipment.Origin,
-            Description = shipment.UsesCarrierTracking
-                ? $"Shipment created with carrier {shipment.CarrierSlug}."
-                : "Shipment was created."
+            Description =
+                $"Shipment was created with " +
+                $"{GetServiceLevelDisplayName(serviceLevel)} service."
         };
 
         _dbContext.ShipmentTrackingEvents.Add(trackingEvent);
@@ -170,22 +216,12 @@ public sealed class ShipmentsController : ControllerBase
             shipment);
     }
 
-    // Employee/Admin only:
-    // PUT api/shipments/{trackingNumber}/status
     [HttpPut("{trackingNumber}/status")]
     public async Task<ActionResult> UpdateStatus(
         string trackingNumber,
         UpdateShipmentStatusRequest request)
     {
         var cleanedTrackingNumber = trackingNumber.Trim();
-
-        if (string.IsNullOrWhiteSpace(cleanedTrackingNumber))
-        {
-            return BadRequest(new
-            {
-                message = "A tracking number is required."
-            });
-        }
 
         var shipment = await _dbContext.Shipments
             .FirstOrDefaultAsync(shipment =>
@@ -196,6 +232,15 @@ public sealed class ShipmentsController : ControllerBase
             return NotFound(new
             {
                 message = "Shipment not found."
+            });
+        }
+
+        if (shipment.CurrentStatus == ShipmentStatus.Delivered)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "A delivered shipment cannot receive more updates."
             });
         }
 
@@ -225,8 +270,8 @@ public sealed class ShipmentsController : ControllerBase
             {
                 message =
                     $"A shipment cannot move from " +
-                    $"{GetStatusDisplayName(shipment.CurrentStatus)} to " +
-                    $"{GetStatusDisplayName(newStatus)}."
+                    $"{GetStatusDisplayName(shipment.CurrentStatus)} " +
+                    $"to {GetStatusDisplayName(newStatus)}."
             });
         }
 
@@ -240,8 +285,7 @@ public sealed class ShipmentsController : ControllerBase
         {
             return BadRequest(new
             {
-                message =
-                    "A current shipment location is required."
+                message = "A current location is required."
             });
         }
 
@@ -249,8 +293,7 @@ public sealed class ShipmentsController : ControllerBase
         {
             return BadRequest(new
             {
-                message =
-                    "A tracking description is required."
+                message = "A tracking description is required."
             });
         }
 
@@ -275,31 +318,17 @@ public sealed class ShipmentsController : ControllerBase
 
             shipment.Id,
             shipment.TrackingNumber,
-            shipment.CarrierSlug,
-            shipment.CarrierTrackingNumber,
-            shipment.UsesCarrierTracking,
             shipment.CurrentStatus,
-
             TrackingEvent = trackingEvent
         });
     }
 
-    // Employee/Admin only:
-    // POST api/shipments/{trackingNumber}/register-carrier
     [HttpPost("{trackingNumber}/register-carrier")]
     public async Task<IActionResult> RegisterCarrierTracking(
         string trackingNumber,
         CancellationToken cancellationToken)
     {
         var cleanedTrackingNumber = trackingNumber.Trim();
-
-        if (string.IsNullOrWhiteSpace(cleanedTrackingNumber))
-        {
-            return BadRequest(new
-            {
-                message = "A tracking number is required."
-            });
-        }
 
         var shipment = await _dbContext.Shipments
             .FirstOrDefaultAsync(
@@ -369,6 +398,78 @@ public sealed class ShipmentsController : ControllerBase
             ) => true,
 
             _ => false
+        };
+    }
+
+    private static decimal CalculateShippingCost(
+        decimal actualWeightKg,
+        decimal lengthCm,
+        decimal widthCm,
+        decimal heightCm,
+        ShipmentServiceLevel serviceLevel)
+    {
+        var dimensionalWeightKg =
+            lengthCm * widthCm * heightCm / 5000m;
+
+        var billableWeightKg =
+            Math.Max(actualWeightKg, dimensionalWeightKg);
+
+        var pricing = serviceLevel switch
+        {
+            ShipmentServiceLevel.Standard =>
+                (BasePrice: 8.00m, PricePerKg: 1.25m),
+
+            ShipmentServiceLevel.Express =>
+                (BasePrice: 15.00m, PricePerKg: 2.25m),
+
+            ShipmentServiceLevel.SameDay =>
+                (BasePrice: 25.00m, PricePerKg: 3.50m),
+
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(serviceLevel))
+        };
+
+        return Math.Round(
+            pricing.BasePrice +
+            billableWeightKg * pricing.PricePerKg,
+            2,
+            MidpointRounding.AwayFromZero);
+    }
+
+    private static DateTime CalculateEstimatedDeliveryDate(
+        DateTime createdAtUtc,
+        ShipmentServiceLevel serviceLevel)
+    {
+        return serviceLevel switch
+        {
+            ShipmentServiceLevel.Standard =>
+                createdAtUtc.AddDays(5),
+
+            ShipmentServiceLevel.Express =>
+                createdAtUtc.AddDays(2),
+
+            ShipmentServiceLevel.SameDay =>
+                createdAtUtc.AddHours(8),
+
+            _ => createdAtUtc.AddDays(5)
+        };
+    }
+
+    private static string GetServiceLevelDisplayName(
+        ShipmentServiceLevel serviceLevel)
+    {
+        return serviceLevel switch
+        {
+            ShipmentServiceLevel.Standard =>
+                "Standard",
+
+            ShipmentServiceLevel.Express =>
+                "Express",
+
+            ShipmentServiceLevel.SameDay =>
+                "Same Day",
+
+            _ => serviceLevel.ToString()
         };
     }
 

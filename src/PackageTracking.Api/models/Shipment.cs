@@ -19,6 +19,25 @@ public sealed class Shipment
 
     public DateTime CreatedAtUtc { get; init; } = DateTime.UtcNow;
 
+    // Package information
+    public decimal WeightKg { get; set; }
+
+    public decimal LengthCm { get; set; }
+
+    public decimal WidthCm { get; set; }
+
+    public decimal HeightCm { get; set; }
+
+    public ShipmentServiceLevel ServiceLevel { get; set; } =
+        ShipmentServiceLevel.Standard;
+
+    public DateTime? EstimatedDeliveryDateUtc { get; set; }
+
+    public decimal ShippingCost { get; set; }
+
+    public string DeliveryInstructions { get; set; } = string.Empty;
+
+    // External carrier information
     public string? CarrierSlug { get; set; }
 
     public string? CarrierTrackingNumber { get; set; }
@@ -28,4 +47,3 @@ public sealed class Shipment
     public ICollection<ShipmentTrackingEvent> TrackingHistory { get; set; } =
         new List<ShipmentTrackingEvent>();
 }
-  
