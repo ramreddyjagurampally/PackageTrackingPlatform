@@ -3,8 +3,8 @@ import type { FormEvent } from "react";
 import "./App.css";
 
 type TrackingEvent = {
-  id: string;
-  shipmentId: string;
+  id: number;
+  shipmentId: number;
   status: number;
   location: string;
   description: string;
@@ -12,7 +12,7 @@ type TrackingEvent = {
 };
 
 type Shipment = {
-  id: string;
+  id: number;
   trackingNumber: string;
   senderName: string;
   recipientName: string;
@@ -22,6 +22,8 @@ type Shipment = {
   createdAtUtc: string;
   trackingHistory: TrackingEvent[];
 };
+
+const apiBaseUrl = "http://localhost:5133";
 
 const statusNames = [
   "Created",
@@ -42,10 +44,48 @@ function App() {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [createError, setCreateError] = useState("");
-  const [createdTrackingNumber, setCreatedTrackingNumber] = useState("");
+  const [createdTrackingNumber, setCreatedTrackingNumber] =
+    useState("");
   const [isCreating, setIsCreating] = useState(false);
 
-  async function trackShipment(event: FormEvent<HTMLFormElement>) {
+  const [updateTrackingNumber, setUpdateTrackingNumber] =
+    useState("");
+  const [newStatus, setNewStatus] = useState("1");
+  const [updateLocation, setUpdateLocation] = useState("");
+  const [updateDescription, setUpdateDescription] = useState("");
+  const [updateError, setUpdateError] = useState("");
+  const [updateSuccess, setUpdateSuccess] = useState("");
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  function getStatusName(status: number) {
+    return statusNames[status] ?? "Unknown";
+  }
+
+  async function loadShipment(
+    shipmentTrackingNumber: string
+  ): Promise<Shipment> {
+    const response = await fetch(
+      `${apiBaseUrl}/api/shipments/${encodeURIComponent(
+        shipmentTrackingNumber
+      )}`
+    );
+
+    if (response.status === 404) {
+      throw new Error(
+        "No shipment was found with that tracking number."
+      );
+    }
+
+    if (!response.ok) {
+      throw new Error("The shipment could not be loaded.");
+    }
+
+    return response.json();
+  }
+
+  async function trackShipment(
+    event: FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
 
     const cleanedTrackingNumber = trackingNumber.trim();
@@ -61,22 +101,10 @@ function App() {
     setShipment(null);
 
     try {
-      const response = await fetch(
-        `http://localhost:5133/api/shipments/${encodeURIComponent(
-          cleanedTrackingNumber
-        )}`
-      );
+      const data = await loadShipment(cleanedTrackingNumber);
 
-      if (response.status === 404) {
-        throw new Error("No shipment was found with that tracking number.");
-      }
-
-      if (!response.ok) {
-        throw new Error("The shipment could not be loaded.");
-      }
-
-      const data: Shipment = await response.json();
       setShipment(data);
+      setUpdateTrackingNumber(data.trackingNumber);
     } catch (requestError) {
       const message =
         requestError instanceof Error
@@ -89,7 +117,9 @@ function App() {
     }
   }
 
-  async function createShipment(event: FormEvent<HTMLFormElement>) {
+  async function createShipment(
+    event: FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
 
     if (
@@ -108,7 +138,7 @@ function App() {
 
     try {
       const response = await fetch(
-        "http://localhost:5133/api/shipments",
+        `${apiBaseUrl}/api/shipments`,
         {
           method: "POST",
           headers: {
@@ -129,8 +159,15 @@ function App() {
 
       const createdShipment: Shipment = await response.json();
 
-      setCreatedTrackingNumber(createdShipment.trackingNumber);
+      setCreatedTrackingNumber(
+        createdShipment.trackingNumber
+      );
+
       setTrackingNumber(createdShipment.trackingNumber);
+      setUpdateTrackingNumber(
+        createdShipment.trackingNumber
+      );
+      setShipment(createdShipment);
 
       setSenderName("");
       setRecipientName("");
@@ -148,37 +185,125 @@ function App() {
     }
   }
 
-  function getStatusName(status: number) {
-    return statusNames[status] ?? "Unknown";
+  async function updateShipmentStatus(
+    event: FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+
+    const cleanedTrackingNumber =
+      updateTrackingNumber.trim();
+
+    if (
+      !cleanedTrackingNumber ||
+      !updateLocation.trim() ||
+      !updateDescription.trim()
+    ) {
+      setUpdateError(
+        "Please complete the tracking number, location, and description."
+      );
+      return;
+    }
+
+    setIsUpdating(true);
+    setUpdateError("");
+    setUpdateSuccess("");
+
+    try {
+      const statusValue = Number(newStatus);
+
+      const response = await fetch(
+        `${apiBaseUrl}/api/shipments/${encodeURIComponent(
+          cleanedTrackingNumber
+        )}/status`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            status: statusValue,
+            location: updateLocation.trim(),
+            description: updateDescription.trim(),
+          }),
+        }
+      );
+
+      if (response.status === 404) {
+        throw new Error(
+          "No shipment was found with that tracking number."
+        );
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          "The shipment status could not be updated."
+        );
+      }
+
+      const refreshedShipment = await loadShipment(
+        cleanedTrackingNumber
+      );
+
+      setShipment(refreshedShipment);
+      setTrackingNumber(cleanedTrackingNumber);
+
+      setUpdateSuccess(
+        `Shipment updated to ${getStatusName(statusValue)}.`
+      );
+
+      setUpdateLocation("");
+      setUpdateDescription("");
+    } catch (requestError) {
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "An unexpected error occurred.";
+
+      setUpdateError(message);
+    } finally {
+      setIsUpdating(false);
+    }
   }
 
   return (
     <main className="page">
       <section className="hero">
-        <p className="eyebrow">Package Tracking Platform</p>
+        <p className="eyebrow">
+          Package Tracking Platform
+        </p>
+
         <h1>Track your shipment</h1>
 
         <p className="subtitle">
-          Enter your tracking number to view the current status and complete
-          delivery history.
+          Enter your tracking number to view the current
+          status and complete delivery history.
         </p>
 
-        <form className="tracking-form" onSubmit={trackShipment}>
+        <form
+          className="tracking-form"
+          onSubmit={trackShipment}
+        >
           <input
             type="text"
             value={trackingNumber}
-            onChange={(event) => setTrackingNumber(event.target.value)}
+            onChange={(event) =>
+              setTrackingNumber(event.target.value)
+            }
             placeholder="Example: PTR-2B1B4D89B1"
             aria-label="Tracking number"
           />
 
           <button type="submit" disabled={isTracking}>
-            {isTracking ? "Searching..." : "Track Package"}
+            {isTracking
+              ? "Searching..."
+              : "Track Package"}
           </button>
         </form>
 
         {trackingError && (
-          <p className="error-message">{trackingError}</p>
+          <p className="error-message">
+            {trackingError}
+          </p>
         )}
       </section>
 
@@ -186,12 +311,17 @@ function App() {
         <section className="shipment-card">
           <div className="shipment-heading">
             <div>
-              <p className="label">Tracking number</p>
+              <p className="label">
+                Tracking number
+              </p>
+
               <h2>{shipment.trackingNumber}</h2>
             </div>
 
             <span className="status-badge">
-              {getStatusName(shipment.currentStatus)}
+              {getStatusName(
+                shipment.currentStatus
+              )}
             </span>
           </div>
 
@@ -212,7 +342,9 @@ function App() {
             </div>
 
             <div>
-              <p className="label">Destination</p>
+              <p className="label">
+                Destination
+              </p>
               <p>{shipment.destination}</p>
             </div>
           </div>
@@ -220,35 +352,50 @@ function App() {
           <div className="history-section">
             <h3>Tracking history</h3>
 
-            {shipment.trackingHistory.length === 0 ? (
-              <p>No tracking events are available yet.</p>
+            {shipment.trackingHistory.length ===
+            0 ? (
+              <p>
+                No tracking events are available
+                yet.
+              </p>
             ) : (
               <div className="timeline">
-                {shipment.trackingHistory.map((trackingEvent) => (
-                  <article
-                    className="timeline-item"
-                    key={trackingEvent.id}
-                  >
-                    <div className="timeline-dot" />
+                {shipment.trackingHistory.map(
+                  (trackingEvent) => (
+                    <article
+                      className="timeline-item"
+                      key={trackingEvent.id}
+                    >
+                      <div className="timeline-dot" />
 
-                    <div>
-                      <div className="timeline-heading">
-                        <strong>
-                          {getStatusName(trackingEvent.status)}
-                        </strong>
+                      <div>
+                        <div className="timeline-heading">
+                          <strong>
+                            {getStatusName(
+                              trackingEvent.status
+                            )}
+                          </strong>
 
-                        <time>
-                          {new Date(
-                            trackingEvent.occurredAtUtc
-                          ).toLocaleString()}
-                        </time>
+                          <time>
+                            {new Date(
+                              trackingEvent.occurredAtUtc
+                            ).toLocaleString()}
+                          </time>
+                        </div>
+
+                        <p>
+                          {trackingEvent.location}
+                        </p>
+
+                        <small>
+                          {
+                            trackingEvent.description
+                          }
+                        </small>
                       </div>
-
-                      <p>{trackingEvent.location}</p>
-                      <small>{trackingEvent.description}</small>
-                    </div>
-                  </article>
-                ))}
+                    </article>
+                  )
+                )}
               </div>
             )}
           </div>
@@ -257,20 +404,30 @@ function App() {
 
       <section className="create-section">
         <div className="section-heading">
-          <p className="eyebrow">Shipment Management</p>
+          <p className="eyebrow">
+            Shipment Management
+          </p>
+
           <h2>Create a new shipment</h2>
+
           <p>
-            Enter the sender, recipient, origin, and destination information.
+            Enter the sender, recipient, origin,
+            and destination information.
           </p>
         </div>
 
-        <form className="create-form" onSubmit={createShipment}>
+        <form
+          className="create-form"
+          onSubmit={createShipment}
+        >
           <label>
             Sender name
             <input
               type="text"
               value={senderName}
-              onChange={(event) => setSenderName(event.target.value)}
+              onChange={(event) =>
+                setSenderName(event.target.value)
+              }
               placeholder="Enter sender name"
             />
           </label>
@@ -280,7 +437,11 @@ function App() {
             <input
               type="text"
               value={recipientName}
-              onChange={(event) => setRecipientName(event.target.value)}
+              onChange={(event) =>
+                setRecipientName(
+                  event.target.value
+                )
+              }
               placeholder="Enter recipient name"
             />
           </label>
@@ -290,7 +451,9 @@ function App() {
             <input
               type="text"
               value={origin}
-              onChange={(event) => setOrigin(event.target.value)}
+              onChange={(event) =>
+                setOrigin(event.target.value)
+              }
               placeholder="Example: Detroit, Michigan"
             />
           </label>
@@ -300,23 +463,150 @@ function App() {
             <input
               type="text"
               value={destination}
-              onChange={(event) => setDestination(event.target.value)}
+              onChange={(event) =>
+                setDestination(event.target.value)
+              }
               placeholder="Example: Chicago, Illinois"
             />
           </label>
 
-          <button type="submit" disabled={isCreating}>
-            {isCreating ? "Creating..." : "Create Shipment"}
+          <button
+            type="submit"
+            disabled={isCreating}
+          >
+            {isCreating
+              ? "Creating..."
+              : "Create Shipment"}
           </button>
         </form>
 
-        {createError && <p className="error-message">{createError}</p>}
+        {createError && (
+          <p className="error-message">
+            {createError}
+          </p>
+        )}
 
         {createdTrackingNumber && (
           <div className="success-message">
-            <strong>Shipment created successfully!</strong>
+            <strong>
+              Shipment created successfully!
+            </strong>
+
             <p>Your tracking number is:</p>
-            <code>{createdTrackingNumber}</code>
+
+            <code>
+              {createdTrackingNumber}
+            </code>
+          </div>
+        )}
+      </section>
+
+      <section className="create-section">
+        <div className="section-heading">
+          <p className="eyebrow">
+            Employee Tools
+          </p>
+
+          <h2>Update shipment status</h2>
+
+          <p>
+            Add the shipment’s new status,
+            current location, and tracking
+            description.
+          </p>
+        </div>
+
+        <form
+          className="create-form"
+          onSubmit={updateShipmentStatus}
+        >
+          <label>
+            Tracking number
+            <input
+              type="text"
+              value={updateTrackingNumber}
+              onChange={(event) =>
+                setUpdateTrackingNumber(
+                  event.target.value
+                )
+              }
+              placeholder="PTR-588AA51789"
+            />
+          </label>
+
+          <label>
+            New status
+            <select
+              value={newStatus}
+              onChange={(event) =>
+                setNewStatus(event.target.value)
+              }
+            >
+              <option value="1">
+                Package Received
+              </option>
+
+              <option value="2">
+                In Transit
+              </option>
+
+              <option value="3">
+                Out for Delivery
+              </option>
+
+              <option value="4">
+                Delivered
+              </option>
+            </select>
+          </label>
+
+          <label>
+            Current location
+            <input
+              type="text"
+              value={updateLocation}
+              onChange={(event) =>
+                setUpdateLocation(
+                  event.target.value
+                )
+              }
+              placeholder="Example: Toledo, Ohio"
+            />
+          </label>
+
+          <label>
+            Description
+            <input
+              type="text"
+              value={updateDescription}
+              onChange={(event) =>
+                setUpdateDescription(
+                  event.target.value
+                )
+              }
+              placeholder="Package arrived at the distribution center"
+            />
+          </label>
+
+          <button
+            type="submit"
+            disabled={isUpdating}
+          >
+            {isUpdating
+              ? "Updating..."
+              : "Update Status"}
+          </button>
+        </form>
+
+        {updateError && (
+          <p className="error-message">
+            {updateError}
+          </p>
+        )}
+
+        {updateSuccess && (
+          <div className="success-message">
+            <strong>{updateSuccess}</strong>
           </div>
         )}
       </section>
