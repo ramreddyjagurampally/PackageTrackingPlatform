@@ -25,12 +25,23 @@ type Shipment = {
   lengthCm: number;
   widthCm: number;
   heightCm: number;
+
   serviceLevel: number;
   estimatedDeliveryDateUtc: string | null;
   shippingCost: number;
   deliveryInstructions: string;
 
+  assignedDriverId: number | null;
+  assignedDriverName?: string | null;
+
   trackingHistory?: TrackingEvent[];
+};
+
+type Driver = {
+  id: number;
+  fullName: string;
+  email: string;
+  createdAtUtc: string;
 };
 
 type AuthUser = {
@@ -67,26 +78,35 @@ const serviceNames = [
 ];
 
 function readSavedAuth(): AuthResponse | null {
-  const savedAuth = localStorage.getItem("packageTrackingAuth");
+  const savedAuth =
+    localStorage.getItem("packageTrackingAuth");
 
   if (!savedAuth) {
     return null;
   }
 
   try {
-    const parsedAuth = JSON.parse(savedAuth) as AuthResponse;
+    const parsed =
+      JSON.parse(savedAuth) as AuthResponse;
 
     if (
-      parsedAuth.expiresAtUtc &&
-      new Date(parsedAuth.expiresAtUtc) <= new Date()
+      parsed.expiresAtUtc &&
+      new Date(parsed.expiresAtUtc) <=
+        new Date()
     ) {
-      localStorage.removeItem("packageTrackingAuth");
+      localStorage.removeItem(
+        "packageTrackingAuth"
+      );
+
       return null;
     }
 
-    return parsedAuth;
+    return parsed;
   } catch {
-    localStorage.removeItem("packageTrackingAuth");
+    localStorage.removeItem(
+      "packageTrackingAuth"
+    );
+
     return null;
   }
 }
@@ -96,72 +116,50 @@ async function readErrorMessage(
   fallbackMessage: string
 ): Promise<string> {
   try {
-    const errorData = (await response.json()) as ApiError;
+    const data =
+      (await response.json()) as ApiError;
 
-    return errorData.message || fallbackMessage;
+    return data.message || fallbackMessage;
   } catch {
     return fallbackMessage;
   }
 }
 
 function App() {
-  const [auth, setAuth] = useState<AuthResponse | null>(
-    readSavedAuth
-  );
+  const [auth, setAuth] =
+    useState<AuthResponse | null>(
+      readSavedAuth
+    );
 
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-  const [loginError, setLoginError] = useState("");
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginEmail, setLoginEmail] =
+    useState("");
 
-  const [trackingNumber, setTrackingNumber] = useState("");
-  const [shipment, setShipment] = useState<Shipment | null>(null);
-  const [trackingError, setTrackingError] = useState("");
-  const [isTracking, setIsTracking] = useState(false);
+  const [loginPassword, setLoginPassword] =
+    useState("");
 
-  const [senderName, setSenderName] = useState("");
-  const [recipientName, setRecipientName] = useState("");
-  const [origin, setOrigin] = useState("");
-  const [destination, setDestination] = useState("");
+  const [loginError, setLoginError] =
+    useState("");
 
-  const [weightKg, setWeightKg] = useState("1");
-  const [lengthCm, setLengthCm] = useState("20");
-  const [widthCm, setWidthCm] = useState("15");
-  const [heightCm, setHeightCm] = useState("10");
-  const [serviceLevel, setServiceLevel] = useState("0");
+  const [isLoggingIn, setIsLoggingIn] =
+    useState(false);
 
-  const [
-    deliveryInstructions,
-    setDeliveryInstructions,
-  ] = useState("");
+  const [trackingNumber, setTrackingNumber] =
+    useState("");
 
-  const [createError, setCreateError] = useState("");
-  const [
-    createdTrackingNumber,
-    setCreatedTrackingNumber,
-  ] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
+  const [shipment, setShipment] =
+    useState<Shipment | null>(null);
 
-  const [
-    updateTrackingNumber,
-    setUpdateTrackingNumber,
-  ] = useState("");
+  const [trackingError, setTrackingError] =
+    useState("");
 
-  const [newStatus, setNewStatus] = useState("1");
-  const [updateLocation, setUpdateLocation] = useState("");
-  const [
-    updateDescription,
-    setUpdateDescription,
-  ] = useState("");
+  const [isTracking, setIsTracking] =
+    useState(false);
 
-  const [updateError, setUpdateError] = useState("");
-  const [updateSuccess, setUpdateSuccess] = useState("");
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [shipments, setShipments] =
+    useState<Shipment[]>([]);
 
-  const [
-    dashboardShipments,
-    setDashboardShipments,
-  ] = useState<Shipment[]>([]);
+  const [drivers, setDrivers] =
+    useState<Driver[]>([]);
 
   const [dashboardSearch, setDashboardSearch] =
     useState("");
@@ -177,47 +175,178 @@ function App() {
     setIsLoadingDashboard,
   ] = useState(false);
 
+  // Create driver
+  const [driverName, setDriverName] =
+    useState("");
+
+  const [driverEmail, setDriverEmail] =
+    useState("");
+
+  const [driverPassword, setDriverPassword] =
+    useState("");
+
+  const [driverError, setDriverError] =
+    useState("");
+
+  const [driverSuccess, setDriverSuccess] =
+    useState("");
+
+  const [
+    isCreatingDriver,
+    setIsCreatingDriver,
+  ] = useState(false);
+
+  // Driver assignment
+  const [
+    assignmentTrackingNumber,
+    setAssignmentTrackingNumber,
+  ] = useState("");
+
+  const [
+    selectedDriverId,
+    setSelectedDriverId,
+  ] = useState("");
+
+  const [
+    assignmentError,
+    setAssignmentError,
+  ] = useState("");
+
+  const [
+    assignmentSuccess,
+    setAssignmentSuccess,
+  ] = useState("");
+
+  const [isAssigning, setIsAssigning] =
+    useState(false);
+
+  // Create shipment
+  const [senderName, setSenderName] =
+    useState("");
+
+  const [recipientName, setRecipientName] =
+    useState("");
+
+  const [origin, setOrigin] =
+    useState("");
+
+  const [destination, setDestination] =
+    useState("");
+
+  const [weightKg, setWeightKg] =
+    useState("1");
+
+  const [lengthCm, setLengthCm] =
+    useState("20");
+
+  const [widthCm, setWidthCm] =
+    useState("15");
+
+  const [heightCm, setHeightCm] =
+    useState("10");
+
+  const [serviceLevel, setServiceLevel] =
+    useState("0");
+
+  const [
+    deliveryInstructions,
+    setDeliveryInstructions,
+  ] = useState("");
+
+  const [createError, setCreateError] =
+    useState("");
+
+  const [
+    createdTrackingNumber,
+    setCreatedTrackingNumber,
+  ] = useState("");
+
+  const [isCreating, setIsCreating] =
+    useState(false);
+
+  // Status update
+  const [
+    updateTrackingNumber,
+    setUpdateTrackingNumber,
+  ] = useState("");
+
+  const [newStatus, setNewStatus] =
+    useState("1");
+
+  const [
+    updateLocation,
+    setUpdateLocation,
+  ] = useState("");
+
+  const [
+    updateDescription,
+    setUpdateDescription,
+  ] = useState("");
+
+  const [updateError, setUpdateError] =
+    useState("");
+
+  const [updateSuccess, setUpdateSuccess] =
+    useState("");
+
+  const [isUpdating, setIsUpdating] =
+    useState(false);
+
+  const roles =
+    auth?.user.roles ?? [];
+
+  const isAdmin =
+    roles.includes("Admin");
+
+  const isEmployee =
+    roles.includes("Employee");
+
+  const isDriver =
+    roles.includes("Driver");
+
   const canManageShipments =
-    auth?.user.roles.some(
-      (role) =>
-        role === "Admin" ||
-        role === "Employee"
-    ) ?? false;
+    isAdmin || isEmployee;
+
+  const canUpdateShipment =
+    canManageShipments || isDriver;
 
   const dashboardStats = useMemo(() => {
     return {
-      total: dashboardShipments.length,
+      total: shipments.length,
 
-      active: dashboardShipments.filter(
+      active: shipments.filter(
         (item) => item.currentStatus !== 4
       ).length,
 
-      created: dashboardShipments.filter(
+      created: shipments.filter(
         (item) => item.currentStatus === 0
       ).length,
 
-      inTransit: dashboardShipments.filter(
+      inTransit: shipments.filter(
         (item) => item.currentStatus === 2
       ).length,
 
-      outForDelivery: dashboardShipments.filter(
+      outForDelivery: shipments.filter(
         (item) => item.currentStatus === 3
       ).length,
 
-      delivered: dashboardShipments.filter(
+      delivered: shipments.filter(
         (item) => item.currentStatus === 4
       ).length,
     };
-  }, [dashboardShipments]);
+  }, [shipments]);
 
-  const filteredDashboardShipments = useMemo(() => {
+  const filteredShipments = useMemo(() => {
     const searchValue =
-      dashboardSearch.trim().toLowerCase();
+      dashboardSearch
+        .trim()
+        .toLowerCase();
 
-    return dashboardShipments.filter((item) => {
+    return shipments.filter((item) => {
       const matchesStatus =
         dashboardStatus === "all" ||
-        item.currentStatus === Number(dashboardStatus);
+        item.currentStatus ===
+          Number(dashboardStatus);
 
       const matchesSearch =
         !searchValue ||
@@ -235,38 +364,75 @@ function App() {
           .includes(searchValue) ||
         item.destination
           .toLowerCase()
+          .includes(searchValue) ||
+        (
+          item.assignedDriverName ?? ""
+        )
+          .toLowerCase()
           .includes(searchValue);
 
-      return matchesStatus && matchesSearch;
+      return matchesStatus &&
+        matchesSearch;
     });
   }, [
-    dashboardShipments,
+    shipments,
     dashboardSearch,
     dashboardStatus,
   ]);
 
   useEffect(() => {
-    if (auth && canManageShipments) {
-      void loadDashboard();
-    } else {
-      setDashboardShipments([]);
+    if (!auth) {
+      setShipments([]);
+      setDrivers([]);
+      return;
     }
-  }, [auth, canManageShipments]);
 
-  function getStatusName(status: number): string {
-    return statusNames[status] ?? "Unknown";
+    if (canManageShipments) {
+      void loadOperationsData();
+      return;
+    }
+
+    if (isDriver) {
+      void loadDriverShipments();
+    }
+  }, [
+    auth,
+    canManageShipments,
+    isDriver,
+  ]);
+
+  function getAuthorizationHeaders():
+    Record<string, string> {
+    if (!auth?.token) {
+      return {};
+    }
+
+    return {
+      Authorization:
+        `Bearer ${auth.token}`,
+    };
+  }
+
+  function getStatusName(
+    status: number
+  ): string {
+    return statusNames[status] ??
+      "Unknown";
   }
 
   function getServiceName(
-    selectedServiceLevel: number
+    serviceLevelValue: number
   ): string {
     return (
-      serviceNames[selectedServiceLevel] ??
-      "Unknown"
+      serviceNames[
+        serviceLevelValue
+      ] ?? "Unknown"
     );
   }
 
-  function getStatusClass(status: number): string {
+  function getStatusClass(
+    status: number
+  ): string {
     switch (status) {
       case 0:
         return "status-created";
@@ -288,15 +454,31 @@ function App() {
     }
   }
 
-  function getAuthorizationHeaders():
-    Record<string, string> {
-    if (!auth?.token) {
-      return {};
-    }
+  function selectShipmentForWork(
+    selectedShipment: Shipment
+  ): void {
+    setTrackingNumber(
+      selectedShipment.trackingNumber
+    );
 
-    return {
-      Authorization: `Bearer ${auth.token}`,
-    };
+    setUpdateTrackingNumber(
+      selectedShipment.trackingNumber
+    );
+
+    setAssignmentTrackingNumber(
+      selectedShipment.trackingNumber
+    );
+
+    if (
+      selectedShipment.currentStatus < 4
+    ) {
+      setNewStatus(
+        String(
+          selectedShipment.currentStatus +
+            1
+        )
+      );
+    }
   }
 
   async function login(
@@ -304,9 +486,12 @@ function App() {
   ): Promise<void> {
     event.preventDefault();
 
-    if (!loginEmail.trim() || !loginPassword) {
+    if (
+      !loginEmail.trim() ||
+      !loginPassword
+    ) {
       setLoginError(
-        "Please enter your email and password."
+        "Enter your email and password."
       );
 
       return;
@@ -322,7 +507,8 @@ function App() {
           method: "POST",
 
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
 
           body: JSON.stringify({
@@ -351,11 +537,11 @@ function App() {
 
       setAuth(loginResponse);
       setLoginPassword("");
-    } catch (requestError) {
+    } catch (error) {
       setLoginError(
-        requestError instanceof Error
-          ? requestError.message
-          : "An unexpected login error occurred."
+        error instanceof Error
+          ? error.message
+          : "Login failed."
       );
     } finally {
       setIsLoggingIn(false);
@@ -363,41 +549,43 @@ function App() {
   }
 
   function logout(): void {
-    localStorage.removeItem("packageTrackingAuth");
+    localStorage.removeItem(
+      "packageTrackingAuth"
+    );
 
     setAuth(null);
     setShipment(null);
-    setDashboardShipments([]);
-    setCreateError("");
-    setUpdateError("");
+    setShipments([]);
+    setDrivers([]);
+
+    setDriverSuccess("");
+    setAssignmentSuccess("");
     setUpdateSuccess("");
   }
 
   async function loadShipment(
-    shipmentTrackingNumber: string
+    selectedTrackingNumber: string
   ): Promise<Shipment> {
     const response = await fetch(
       `${apiBaseUrl}/api/shipments/${encodeURIComponent(
-        shipmentTrackingNumber
+        selectedTrackingNumber
       )}`
     );
-
-    if (response.status === 404) {
-      throw new Error(
-        "No shipment was found with that tracking number."
-      );
-    }
 
     if (!response.ok) {
       throw new Error(
         await readErrorMessage(
           response,
-          "The shipment could not be loaded."
+          response.status === 404
+            ? "Shipment not found."
+            : "The shipment could not be loaded."
         )
       );
     }
 
-    return (await response.json()) as Shipment;
+    return (
+      (await response.json()) as Shipment
+    );
   }
 
   async function trackShipment(
@@ -410,45 +598,107 @@ function App() {
 
     if (!cleanedTrackingNumber) {
       setTrackingError(
-        "Please enter a tracking number."
+        "Enter a tracking number."
       );
 
-      setShipment(null);
       return;
     }
 
     setIsTracking(true);
     setTrackingError("");
-    setShipment(null);
 
     try {
-      const data = await loadShipment(
-        cleanedTrackingNumber
-      );
+      const data =
+        await loadShipment(
+          cleanedTrackingNumber
+        );
 
       setShipment(data);
-      setUpdateTrackingNumber(
-        data.trackingNumber
-      );
+      selectShipmentForWork(data);
+    } catch (error) {
+      setShipment(null);
 
-      if (data.currentStatus < 4) {
-        setNewStatus(
-          String(data.currentStatus + 1)
-        );
-      }
-    } catch (requestError) {
       setTrackingError(
-        requestError instanceof Error
-          ? requestError.message
-          : "An unexpected tracking error occurred."
+        error instanceof Error
+          ? error.message
+          : "The shipment could not be loaded."
       );
     } finally {
       setIsTracking(false);
     }
   }
 
-  async function loadDashboard(): Promise<void> {
-    if (!auth?.token || !canManageShipments) {
+  async function loadOperationsData():
+    Promise<void> {
+    if (!auth?.token) {
+      return;
+    }
+
+    setIsLoadingDashboard(true);
+    setDashboardError("");
+
+    try {
+      const [
+        shipmentResponse,
+        driverResponse,
+      ] = await Promise.all([
+        fetch(
+          `${apiBaseUrl}/api/shipments`,
+          {
+            headers:
+              getAuthorizationHeaders(),
+          }
+        ),
+
+        fetch(
+          `${apiBaseUrl}/api/drivers`,
+          {
+            headers:
+              getAuthorizationHeaders(),
+          }
+        ),
+      ]);
+
+      if (!shipmentResponse.ok) {
+        throw new Error(
+          await readErrorMessage(
+            shipmentResponse,
+            "The shipment dashboard could not be loaded."
+          )
+        );
+      }
+
+      if (!driverResponse.ok) {
+        throw new Error(
+          await readErrorMessage(
+            driverResponse,
+            "The driver list could not be loaded."
+          )
+        );
+      }
+
+      const shipmentData =
+        (await shipmentResponse.json()) as Shipment[];
+
+      const driverData =
+        (await driverResponse.json()) as Driver[];
+
+      setShipments(shipmentData);
+      setDrivers(driverData);
+    } catch (error) {
+      setDashboardError(
+        error instanceof Error
+          ? error.message
+          : "The dashboard could not be loaded."
+      );
+    } finally {
+      setIsLoadingDashboard(false);
+    }
+  }
+
+  async function loadDriverShipments():
+    Promise<void> {
+    if (!auth?.token) {
       return;
     }
 
@@ -457,31 +707,18 @@ function App() {
 
     try {
       const response = await fetch(
-        `${apiBaseUrl}/api/shipments`,
+        `${apiBaseUrl}/api/drivers/my-shipments`,
         {
-          headers: {
-            ...getAuthorizationHeaders(),
-          },
+          headers:
+            getAuthorizationHeaders(),
         }
       );
-
-      if (response.status === 401) {
-        throw new Error(
-          "Your login session expired. Please log in again."
-        );
-      }
-
-      if (response.status === 403) {
-        throw new Error(
-          "Your account does not have dashboard access."
-        );
-      }
 
       if (!response.ok) {
         throw new Error(
           await readErrorMessage(
             response,
-            "The shipment dashboard could not be loaded."
+            "Your assigned shipments could not be loaded."
           )
         );
       }
@@ -489,52 +726,64 @@ function App() {
       const data =
         (await response.json()) as Shipment[];
 
-      setDashboardShipments(data);
-    } catch (requestError) {
+      setShipments(data);
+    } catch (error) {
       setDashboardError(
-        requestError instanceof Error
-          ? requestError.message
-          : "An unexpected dashboard error occurred."
+        error instanceof Error
+          ? error.message
+          : "Assigned shipments could not be loaded."
       );
     } finally {
       setIsLoadingDashboard(false);
     }
   }
 
-  async function openDashboardShipment(
+  async function refreshDashboard():
+    Promise<void> {
+    if (canManageShipments) {
+      await loadOperationsData();
+      return;
+    }
+
+    if (isDriver) {
+      await loadDriverShipments();
+    }
+  }
+
+  async function openShipment(
     selectedShipment: Shipment
   ): Promise<void> {
-    setTrackingError("");
     setIsTracking(true);
+    setTrackingError("");
 
     try {
-      const fullShipment = await loadShipment(
-        selectedShipment.trackingNumber
-      );
-
-      setShipment(fullShipment);
-      setTrackingNumber(
-        fullShipment.trackingNumber
-      );
-
-      setUpdateTrackingNumber(
-        fullShipment.trackingNumber
-      );
-
-      if (fullShipment.currentStatus < 4) {
-        setNewStatus(
-          String(fullShipment.currentStatus + 1)
+      const completeShipment =
+        await loadShipment(
+          selectedShipment.trackingNumber
         );
-      }
+
+      setShipment({
+        ...completeShipment,
+
+        assignedDriverId:
+          selectedShipment.assignedDriverId,
+
+        assignedDriverName:
+          selectedShipment.assignedDriverName,
+      });
+
+      selectShipmentForWork(
+        selectedShipment
+      );
 
       window.scrollTo({
         top: 0,
         behavior: "smooth",
       });
-    } catch (requestError) {
+    } catch (error) {
       setTrackingError(
-        requestError instanceof Error
-          ? requestError.message
+        error instanceof Error
+          ? error.message
           : "The shipment could not be opened."
       );
     } finally {
@@ -542,44 +791,190 @@ function App() {
     }
   }
 
-  async function createShipment(
+  async function createDriver(
     event: FormEvent<HTMLFormElement>
   ): Promise<void> {
     event.preventDefault();
 
-    if (!canManageShipments) {
-      setCreateError(
-        "You must be logged in as an employee or administrator."
+    setIsCreatingDriver(true);
+    setDriverError("");
+    setDriverSuccess("");
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/drivers`,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+
+            ...getAuthorizationHeaders(),
+          },
+
+          body: JSON.stringify({
+            fullName: driverName.trim(),
+            email: driverEmail.trim(),
+            password: driverPassword,
+          }),
+        }
       );
 
-      return;
+      if (!response.ok) {
+        throw new Error(
+          await readErrorMessage(
+            response,
+            "The driver account could not be created."
+          )
+        );
+      }
+
+      setDriverSuccess(
+        "Driver account created successfully."
+      );
+
+      setDriverName("");
+      setDriverEmail("");
+      setDriverPassword("");
+
+      await loadOperationsData();
+    } catch (error) {
+      setDriverError(
+        error instanceof Error
+          ? error.message
+          : "The driver account could not be created."
+      );
+    } finally {
+      setIsCreatingDriver(false);
     }
+  }
+
+  async function assignDriver(
+    event: FormEvent<HTMLFormElement>
+  ): Promise<void> {
+    event.preventDefault();
 
     if (
-      !senderName.trim() ||
-      !recipientName.trim() ||
-      !origin.trim() ||
-      !destination.trim()
+      !assignmentTrackingNumber.trim() ||
+      !selectedDriverId
     ) {
-      setCreateError(
-        "Please complete all sender and destination fields."
+      setAssignmentError(
+        "Select a shipment and a driver."
       );
 
       return;
     }
 
-    if (
-      Number(weightKg) <= 0 ||
-      Number(lengthCm) <= 0 ||
-      Number(widthCm) <= 0 ||
-      Number(heightCm) <= 0
-    ) {
-      setCreateError(
-        "Weight and dimensions must be greater than zero."
+    setIsAssigning(true);
+    setAssignmentError("");
+    setAssignmentSuccess("");
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/drivers/shipments/${encodeURIComponent(
+          assignmentTrackingNumber.trim()
+        )}/assign`,
+        {
+          method: "PUT",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+
+            ...getAuthorizationHeaders(),
+          },
+
+          body: JSON.stringify({
+            driverId:
+              Number(selectedDriverId),
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          await readErrorMessage(
+            response,
+            "The shipment could not be assigned."
+          )
+        );
+      }
+
+      setAssignmentSuccess(
+        "Shipment assigned successfully."
+      );
+
+      await loadOperationsData();
+    } catch (error) {
+      setAssignmentError(
+        error instanceof Error
+          ? error.message
+          : "The shipment could not be assigned."
+      );
+    } finally {
+      setIsAssigning(false);
+    }
+  }
+
+  async function removeAssignment():
+    Promise<void> {
+    const cleanedTrackingNumber =
+      assignmentTrackingNumber.trim();
+
+    if (!cleanedTrackingNumber) {
+      setAssignmentError(
+        "Enter or select a tracking number."
       );
 
       return;
     }
+
+    setIsAssigning(true);
+    setAssignmentError("");
+    setAssignmentSuccess("");
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/drivers/shipments/${encodeURIComponent(
+          cleanedTrackingNumber
+        )}/assignment`,
+        {
+          method: "DELETE",
+          headers:
+            getAuthorizationHeaders(),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          await readErrorMessage(
+            response,
+            "The assignment could not be removed."
+          )
+        );
+      }
+
+      setAssignmentSuccess(
+        "Driver assignment removed."
+      );
+
+      await loadOperationsData();
+    } catch (error) {
+      setAssignmentError(
+        error instanceof Error
+          ? error.message
+          : "The assignment could not be removed."
+      );
+    } finally {
+      setIsAssigning(false);
+    }
+  }
+
+  async function createShipment(
+    event: FormEvent<HTMLFormElement>
+  ): Promise<void> {
+    event.preventDefault();
 
     setIsCreating(true);
     setCreateError("");
@@ -592,22 +987,39 @@ function App() {
           method: "POST",
 
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
+
             ...getAuthorizationHeaders(),
           },
 
           body: JSON.stringify({
-            senderName: senderName.trim(),
-            recipientName: recipientName.trim(),
-            origin: origin.trim(),
-            destination: destination.trim(),
+            senderName:
+              senderName.trim(),
 
-            weightKg: Number(weightKg),
-            lengthCm: Number(lengthCm),
-            widthCm: Number(widthCm),
-            heightCm: Number(heightCm),
+            recipientName:
+              recipientName.trim(),
 
-            serviceLevel: Number(serviceLevel),
+            origin:
+              origin.trim(),
+
+            destination:
+              destination.trim(),
+
+            weightKg:
+              Number(weightKg),
+
+            lengthCm:
+              Number(lengthCm),
+
+            widthCm:
+              Number(widthCm),
+
+            heightCm:
+              Number(heightCm),
+
+            serviceLevel:
+              Number(serviceLevel),
 
             deliveryInstructions:
               deliveryInstructions.trim(),
@@ -627,20 +1039,15 @@ function App() {
       const createdShipment =
         (await response.json()) as Shipment;
 
+      setShipment(createdShipment);
+
       setCreatedTrackingNumber(
         createdShipment.trackingNumber
       );
 
-      setTrackingNumber(
-        createdShipment.trackingNumber
+      selectShipmentForWork(
+        createdShipment
       );
-
-      setUpdateTrackingNumber(
-        createdShipment.trackingNumber
-      );
-
-      setNewStatus("1");
-      setShipment(createdShipment);
 
       setSenderName("");
       setRecipientName("");
@@ -655,12 +1062,12 @@ function App() {
       setServiceLevel("0");
       setDeliveryInstructions("");
 
-      await loadDashboard();
-    } catch (requestError) {
+      await loadOperationsData();
+    } catch (error) {
       setCreateError(
-        requestError instanceof Error
-          ? requestError.message
-          : "An unexpected shipment error occurred."
+        error instanceof Error
+          ? error.message
+          : "The shipment could not be created."
       );
     } finally {
       setIsCreating(false);
@@ -672,35 +1079,13 @@ function App() {
   ): Promise<void> {
     event.preventDefault();
 
-    if (!canManageShipments) {
-      setUpdateError(
-        "You must be logged in as an employee or administrator."
-      );
-
-      return;
-    }
-
-    const cleanedTrackingNumber =
-      updateTrackingNumber.trim();
-
-    if (
-      !cleanedTrackingNumber ||
-      !updateLocation.trim() ||
-      !updateDescription.trim()
-    ) {
-      setUpdateError(
-        "Please complete the tracking number, location, and description."
-      );
-
-      return;
-    }
-
     setIsUpdating(true);
     setUpdateError("");
     setUpdateSuccess("");
 
     try {
-      const statusValue = Number(newStatus);
+      const cleanedTrackingNumber =
+        updateTrackingNumber.trim();
 
       const response = await fetch(
         `${apiBaseUrl}/api/shipments/${encodeURIComponent(
@@ -710,13 +1095,19 @@ function App() {
           method: "PUT",
 
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
+
             ...getAuthorizationHeaders(),
           },
 
           body: JSON.stringify({
-            status: statusValue,
-            location: updateLocation.trim(),
+            status:
+              Number(newStatus),
+
+            location:
+              updateLocation.trim(),
+
             description:
               updateDescription.trim(),
           }),
@@ -733,21 +1124,27 @@ function App() {
       }
 
       const refreshedShipment =
-        await loadShipment(cleanedTrackingNumber);
+        await loadShipment(
+          cleanedTrackingNumber
+        );
 
-      setShipment(refreshedShipment);
-      setTrackingNumber(cleanedTrackingNumber);
+      setShipment(
+        refreshedShipment
+      );
 
       setUpdateSuccess(
         `Shipment updated to ${getStatusName(
-          statusValue
+          Number(newStatus)
         )}.`
       );
 
-      if (refreshedShipment.currentStatus < 4) {
+      if (
+        refreshedShipment.currentStatus < 4
+      ) {
         setNewStatus(
           String(
-            refreshedShipment.currentStatus + 1
+            refreshedShipment.currentStatus +
+              1
           )
         );
       }
@@ -755,12 +1152,12 @@ function App() {
       setUpdateLocation("");
       setUpdateDescription("");
 
-      await loadDashboard();
-    } catch (requestError) {
+      await refreshDashboard();
+    } catch (error) {
       setUpdateError(
-        requestError instanceof Error
-          ? requestError.message
-          : "An unexpected status error occurred."
+        error instanceof Error
+          ? error.message
+          : "The shipment status could not be updated."
       );
     } finally {
       setIsUpdating(false);
@@ -777,9 +1174,9 @@ function App() {
         <h1>Track your shipment</h1>
 
         <p className="subtitle">
-          Enter a tracking number to view its status,
-          package information, estimated delivery, and
-          complete history.
+          Track packages, manage drivers,
+          assign deliveries, and update
+          shipment progress.
         </p>
 
         <form
@@ -790,7 +1187,9 @@ function App() {
             type="text"
             value={trackingNumber}
             onChange={(event) =>
-              setTrackingNumber(event.target.value)
+              setTrackingNumber(
+                event.target.value
+              )
             }
             placeholder="Example: PTR-A8B1388E99"
           />
@@ -820,13 +1219,11 @@ function App() {
                 Account Access
               </p>
 
-              <h2>
-                Employee and administrator login
-              </h2>
+              <h2>Login</h2>
 
               <p>
-                Sign in to manage shipments and
-                view the operations dashboard.
+                Administrators, employees,
+                and drivers can sign in.
               </p>
             </div>
 
@@ -845,7 +1242,7 @@ function App() {
                       event.target.value
                     )
                   }
-                  placeholder="Enter your email"
+                  required
                 />
               </label>
 
@@ -860,7 +1257,7 @@ function App() {
                       event.target.value
                     )
                   }
-                  placeholder="Enter your password"
+                  required
                 />
               </label>
 
@@ -884,7 +1281,8 @@ function App() {
           <div className="signed-in-panel">
             <div>
               <strong>
-                Signed in as {auth.user.fullName}
+                Signed in as{" "}
+                {auth.user.fullName}
               </strong>
 
               <p>{auth.user.email}</p>
@@ -905,229 +1303,255 @@ function App() {
         )}
       </section>
 
-      {canManageShipments && (
-        <section className="dashboard-section">
-          <div className="dashboard-heading">
-            <div>
-              <p className="eyebrow">
-                Operations Dashboard
-              </p>
+      {auth &&
+        (canManageShipments ||
+          isDriver) && (
+          <section className="dashboard-section">
+            <div className="dashboard-heading">
+              <div>
+                <p className="eyebrow">
+                  {isDriver &&
+                  !canManageShipments
+                    ? "Driver Dashboard"
+                    : "Operations Dashboard"}
+                </p>
 
-              <h2>Shipment overview</h2>
+                <h2>
+                  {isDriver &&
+                  !canManageShipments
+                    ? "My assigned shipments"
+                    : "Shipment overview"}
+                </h2>
+              </div>
 
-              <p>
-                Search, filter, and open every shipment.
-              </p>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() =>
+                  void refreshDashboard()
+                }
+                disabled={
+                  isLoadingDashboard
+                }
+              >
+                {isLoadingDashboard
+                  ? "Refreshing..."
+                  : "Refresh"}
+              </button>
             </div>
 
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => void loadDashboard()}
-              disabled={isLoadingDashboard}
-            >
-              {isLoadingDashboard
-                ? "Refreshing..."
-                : "Refresh"}
-            </button>
-          </div>
+            <div className="stats-grid">
+              <article className="stat-card">
+                <span>Total shipments</span>
+                <strong>
+                  {dashboardStats.total}
+                </strong>
+              </article>
 
-          <div className="stats-grid">
-            <article className="stat-card">
-              <span>Total shipments</span>
-              <strong>
-                {dashboardStats.total}
-              </strong>
-            </article>
+              <article className="stat-card">
+                <span>Active</span>
+                <strong>
+                  {dashboardStats.active}
+                </strong>
+              </article>
 
-            <article className="stat-card">
-              <span>Active</span>
-              <strong>
-                {dashboardStats.active}
-              </strong>
-            </article>
+              <article className="stat-card">
+                <span>Created</span>
+                <strong>
+                  {dashboardStats.created}
+                </strong>
+              </article>
 
-            <article className="stat-card">
-              <span>Created</span>
-              <strong>
-                {dashboardStats.created}
-              </strong>
-            </article>
+              <article className="stat-card">
+                <span>In transit</span>
+                <strong>
+                  {dashboardStats.inTransit}
+                </strong>
+              </article>
 
-            <article className="stat-card">
-              <span>In transit</span>
-              <strong>
-                {dashboardStats.inTransit}
-              </strong>
-            </article>
+              <article className="stat-card">
+                <span>
+                  Out for delivery
+                </span>
 
-            <article className="stat-card">
-              <span>Out for delivery</span>
-              <strong>
-                {dashboardStats.outForDelivery}
-              </strong>
-            </article>
+                <strong>
+                  {
+                    dashboardStats
+                      .outForDelivery
+                  }
+                </strong>
+              </article>
 
-            <article className="stat-card">
-              <span>Delivered</span>
-              <strong>
-                {dashboardStats.delivered}
-              </strong>
-            </article>
-          </div>
+              <article className="stat-card">
+                <span>Delivered</span>
+                <strong>
+                  {dashboardStats.delivered}
+                </strong>
+              </article>
+            </div>
 
-          <div className="dashboard-controls">
-            <input
-              type="search"
-              value={dashboardSearch}
-              onChange={(event) =>
-                setDashboardSearch(
-                  event.target.value
-                )
-              }
-              placeholder="Search tracking number, customer, or location"
-            />
-
-            <select
-              value={dashboardStatus}
-              onChange={(event) =>
-                setDashboardStatus(
-                  event.target.value
-                )
-              }
-            >
-              <option value="all">
-                All statuses
-              </option>
-
-              <option value="0">
-                Created
-              </option>
-
-              <option value="1">
-                Package Received
-              </option>
-
-              <option value="2">
-                In Transit
-              </option>
-
-              <option value="3">
-                Out for Delivery
-              </option>
-
-              <option value="4">
-                Delivered
-              </option>
-            </select>
-          </div>
-
-          {dashboardError && (
-            <p className="error-message">
-              {dashboardError}
-            </p>
-          )}
-
-          <div className="table-wrap">
-            <table className="shipment-table">
-              <thead>
-                <tr>
-                  <th>Tracking number</th>
-                  <th>Recipient</th>
-                  <th>Route</th>
-                  <th>Service</th>
-                  <th>Status</th>
-                  <th>Cost</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {filteredDashboardShipments.length ===
-                0 ? (
-                  <tr>
-                    <td
-                      colSpan={7}
-                      className="empty-table"
-                    >
-                      No matching shipments were found.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredDashboardShipments.map(
-                    (item) => (
-                      <tr key={item.id}>
-                        <td>
-                          <strong>
-                            {item.trackingNumber}
-                          </strong>
-                        </td>
-
-                        <td>
-                          <div>
-                            {item.recipientName}
-                          </div>
-
-                          <small>
-                            From {item.senderName}
-                          </small>
-                        </td>
-
-                        <td>
-                          <div>{item.origin}</div>
-
-                          <small>
-                            To {item.destination}
-                          </small>
-                        </td>
-
-                        <td>
-                          {getServiceName(
-                            item.serviceLevel
-                          )}
-                        </td>
-
-                        <td>
-                          <span
-                            className={`table-status ${getStatusClass(
-                              item.currentStatus
-                            )}`}
-                          >
-                            {getStatusName(
-                              item.currentStatus
-                            )}
-                          </span>
-                        </td>
-
-                        <td>
-                          $
-                          {Number(
-                            item.shippingCost || 0
-                          ).toFixed(2)}
-                        </td>
-
-                        <td>
-                          <button
-                            type="button"
-                            className="table-button"
-                            onClick={() =>
-                              void openDashboardShipment(
-                                item
-                              )
-                            }
-                          >
-                            View
-                          </button>
-                        </td>
-                      </tr>
-                    )
+            <div className="dashboard-controls">
+              <input
+                type="search"
+                value={dashboardSearch}
+                onChange={(event) =>
+                  setDashboardSearch(
+                    event.target.value
                   )
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
+                }
+                placeholder="Search shipment, customer, location, or driver"
+              />
+
+              <select
+                value={dashboardStatus}
+                onChange={(event) =>
+                  setDashboardStatus(
+                    event.target.value
+                  )
+                }
+              >
+                <option value="all">
+                  All statuses
+                </option>
+
+                <option value="0">
+                  Created
+                </option>
+
+                <option value="1">
+                  Package Received
+                </option>
+
+                <option value="2">
+                  In Transit
+                </option>
+
+                <option value="3">
+                  Out for Delivery
+                </option>
+
+                <option value="4">
+                  Delivered
+                </option>
+              </select>
+            </div>
+
+            {dashboardError && (
+              <p className="error-message">
+                {dashboardError}
+              </p>
+            )}
+
+            <div className="table-wrap">
+              <table className="shipment-table">
+                <thead>
+                  <tr>
+                    <th>Tracking</th>
+                    <th>Recipient</th>
+                    <th>Route</th>
+                    <th>Status</th>
+
+                    {canManageShipments && (
+                      <th>Driver</th>
+                    )}
+
+                    <th>Action</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredShipments.length ===
+                  0 ? (
+                    <tr>
+                      <td
+                        colSpan={
+                          canManageShipments
+                            ? 6
+                            : 5
+                        }
+                        className="empty-table"
+                      >
+                        No matching shipments
+                        were found.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredShipments.map(
+                      (item) => (
+                        <tr key={item.id}>
+                          <td>
+                            <strong>
+                              {
+                                item.trackingNumber
+                              }
+                            </strong>
+                          </td>
+
+                          <td>
+                            <div>
+                              {
+                                item.recipientName
+                              }
+                            </div>
+
+                            <small>
+                              From{" "}
+                              {item.senderName}
+                            </small>
+                          </td>
+
+                          <td>
+                            <div>
+                              {item.origin}
+                            </div>
+
+                            <small>
+                              To{" "}
+                              {item.destination}
+                            </small>
+                          </td>
+
+                          <td>
+                            <span
+                              className={`table-status ${getStatusClass(
+                                item.currentStatus
+                              )}`}
+                            >
+                              {getStatusName(
+                                item.currentStatus
+                              )}
+                            </span>
+                          </td>
+
+                          {canManageShipments && (
+                            <td>
+                              {item.assignedDriverName ||
+                                "Not assigned"}
+                            </td>
+                          )}
+
+                          <td>
+                            <button
+                              type="button"
+                              className="table-button"
+                              onClick={() =>
+                                void openShipment(
+                                  item
+                                )
+                              }
+                            >
+                              View
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
 
       {shipment && (
         <section className="shipment-card">
@@ -1155,17 +1579,28 @@ function App() {
 
           <div className="shipment-grid">
             <div>
-              <p className="label">Sender</p>
+              <p className="label">
+                Sender
+              </p>
+
               <p>{shipment.senderName}</p>
             </div>
 
             <div>
-              <p className="label">Recipient</p>
-              <p>{shipment.recipientName}</p>
+              <p className="label">
+                Recipient
+              </p>
+
+              <p>
+                {shipment.recipientName}
+              </p>
             </div>
 
             <div>
-              <p className="label">Origin</p>
+              <p className="label">
+                Origin
+              </p>
+
               <p>{shipment.origin}</p>
             </div>
 
@@ -1174,7 +1609,9 @@ function App() {
                 Destination
               </p>
 
-              <p>{shipment.destination}</p>
+              <p>
+                {shipment.destination}
+              </p>
             </div>
 
             <div>
@@ -1191,18 +1628,11 @@ function App() {
 
             <div>
               <p className="label">
-                Package weight
-              </p>
-
-              <p>{shipment.weightKg} kg</p>
-            </div>
-
-            <div>
-              <p className="label">
-                Dimensions
+                Package
               </p>
 
               <p>
+                {shipment.weightKg} kg —{" "}
                 {shipment.lengthCm} ×{" "}
                 {shipment.widthCm} ×{" "}
                 {shipment.heightCm} cm
@@ -1236,6 +1666,19 @@ function App() {
               </p>
             </div>
 
+            {canManageShipments && (
+              <div>
+                <p className="label">
+                  Assigned driver
+                </p>
+
+                <p>
+                  {shipment.assignedDriverName ||
+                    "Not assigned"}
+                </p>
+              </div>
+            )}
+
             <div>
               <p className="label">
                 Delivery instructions
@@ -1255,7 +1698,8 @@ function App() {
             shipment.trackingHistory.length ===
               0 ? (
               <p>
-                No tracking events are available.
+                No tracking events are
+                available.
               </p>
             ) : (
               <div className="timeline">
@@ -1283,7 +1727,9 @@ function App() {
                         </div>
 
                         <p>
-                          {trackingEvent.location}
+                          {
+                            trackingEvent.location
+                          }
                         </p>
 
                         <small>
@@ -1301,20 +1747,207 @@ function App() {
         </section>
       )}
 
+      {isAdmin && (
+        <section className="management-section">
+          <div className="section-heading">
+            <p className="eyebrow">
+              Driver Administration
+            </p>
+
+            <h2>
+              Create a driver account
+            </h2>
+
+            <p>
+              Create login credentials for
+              a delivery driver.
+            </p>
+          </div>
+
+          <form
+            className="form-grid"
+            onSubmit={createDriver}
+          >
+            <label>
+              Driver name
+
+              <input
+                type="text"
+                value={driverName}
+                onChange={(event) =>
+                  setDriverName(
+                    event.target.value
+                  )
+                }
+                required
+              />
+            </label>
+
+            <label>
+              Driver email
+
+              <input
+                type="email"
+                value={driverEmail}
+                onChange={(event) =>
+                  setDriverEmail(
+                    event.target.value
+                  )
+                }
+                required
+              />
+            </label>
+
+            <label>
+              Temporary password
+
+              <input
+                type="password"
+                value={driverPassword}
+                onChange={(event) =>
+                  setDriverPassword(
+                    event.target.value
+                  )
+                }
+                minLength={8}
+                required
+              />
+            </label>
+
+            <button
+              type="submit"
+              disabled={isCreatingDriver}
+            >
+              {isCreatingDriver
+                ? "Creating..."
+                : "Create Driver"}
+            </button>
+          </form>
+
+          {driverError && (
+            <p className="error-message">
+              {driverError}
+            </p>
+          )}
+
+          {driverSuccess && (
+            <div className="success-message">
+              <strong>
+                {driverSuccess}
+              </strong>
+            </div>
+          )}
+        </section>
+      )}
+
       {canManageShipments && (
         <div className="management-grid">
+          <section className="management-section">
+            <div className="section-heading">
+              <p className="eyebrow">
+                Driver Assignment
+              </p>
+
+              <h2>
+                Assign a shipment
+              </h2>
+            </div>
+
+            <form
+              className="form-grid"
+              onSubmit={assignDriver}
+            >
+              <label>
+                Tracking number
+
+                <input
+                  type="text"
+                  value={
+                    assignmentTrackingNumber
+                  }
+                  onChange={(event) =>
+                    setAssignmentTrackingNumber(
+                      event.target.value
+                    )
+                  }
+                  placeholder="PTR-..."
+                  required
+                />
+              </label>
+
+              <label>
+                Driver
+
+                <select
+                  value={selectedDriverId}
+                  onChange={(event) =>
+                    setSelectedDriverId(
+                      event.target.value
+                    )
+                  }
+                  required
+                >
+                  <option value="">
+                    Select a driver
+                  </option>
+
+                  {drivers.map((driver) => (
+                    <option
+                      key={driver.id}
+                      value={driver.id}
+                    >
+                      {driver.fullName} —{" "}
+                      {driver.email}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <button
+                type="submit"
+                disabled={isAssigning}
+              >
+                {isAssigning
+                  ? "Saving..."
+                  : "Assign Driver"}
+              </button>
+
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={isAssigning}
+                onClick={() =>
+                  void removeAssignment()
+                }
+              >
+                Remove Assignment
+              </button>
+            </form>
+
+            {assignmentError && (
+              <p className="error-message">
+                {assignmentError}
+              </p>
+            )}
+
+            {assignmentSuccess && (
+              <div className="success-message">
+                <strong>
+                  {assignmentSuccess}
+                </strong>
+              </div>
+            )}
+          </section>
+
           <section className="management-section">
             <div className="section-heading">
               <p className="eyebrow">
                 Shipment Management
               </p>
 
-              <h2>Create a new shipment</h2>
-
-              <p>
-                Enter customer, package, service, and
-                delivery information.
-              </p>
+              <h2>
+                Create a new shipment
+              </h2>
             </div>
 
             <form
@@ -1332,7 +1965,6 @@ function App() {
                       event.target.value
                     )
                   }
-                  placeholder="Enter sender name"
                   required
                 />
               </label>
@@ -1348,7 +1980,6 @@ function App() {
                       event.target.value
                     )
                   }
-                  placeholder="Enter recipient name"
                   required
                 />
               </label>
@@ -1360,9 +1991,10 @@ function App() {
                   type="text"
                   value={origin}
                   onChange={(event) =>
-                    setOrigin(event.target.value)
+                    setOrigin(
+                      event.target.value
+                    )
                   }
-                  placeholder="Detroit, Michigan"
                   required
                 />
               </label>
@@ -1378,7 +2010,6 @@ function App() {
                       event.target.value
                     )
                   }
-                  placeholder="Cleveland, Ohio"
                   required
                 />
               </label>
@@ -1463,15 +2094,15 @@ function App() {
                   }
                 >
                   <option value="0">
-                    Standard — approximately 5 days
+                    Standard
                   </option>
 
                   <option value="1">
-                    Express — approximately 2 days
+                    Express
                   </option>
 
                   <option value="2">
-                    Same Day — approximately 8 hours
+                    Same Day
                   </option>
                 </select>
               </label>
@@ -1481,7 +2112,9 @@ function App() {
 
                 <input
                   type="text"
-                  value={deliveryInstructions}
+                  value={
+                    deliveryInstructions
+                  }
                   onChange={(event) =>
                     setDeliveryInstructions(
                       event.target.value
@@ -1510,149 +2143,140 @@ function App() {
             {createdTrackingNumber && (
               <div className="success-message">
                 <strong>
-                  Shipment created successfully
-                </strong>
-
-                <p>Your tracking number is:</p>
-
-                <code>
-                  {createdTrackingNumber}
-                </code>
-              </div>
-            )}
-          </section>
-
-          <section className="management-section">
-            <div className="section-heading">
-              <p className="eyebrow">
-                Employee Tools
-              </p>
-
-              <h2>Update shipment status</h2>
-
-              <p>
-                Add the next status, location, and
-                tracking description.
-              </p>
-            </div>
-
-            {shipment?.currentStatus === 4 && (
-              <div className="success-message">
-                <strong>
-                  This shipment is delivered.
+                  Shipment created
+                  successfully
                 </strong>
 
                 <p>
-                  Delivered shipments cannot receive
-                  more updates.
+                  {
+                    createdTrackingNumber
+                  }
                 </p>
-              </div>
-            )}
-
-            <form
-              className="form-grid"
-              onSubmit={updateShipmentStatus}
-            >
-              <label>
-                Tracking number
-
-                <input
-                  type="text"
-                  value={updateTrackingNumber}
-                  onChange={(event) =>
-                    setUpdateTrackingNumber(
-                      event.target.value
-                    )
-                  }
-                  placeholder="PTR-A8B1388E99"
-                />
-              </label>
-
-              <label>
-                New status
-
-                <select
-                  value={newStatus}
-                  onChange={(event) =>
-                    setNewStatus(
-                      event.target.value
-                    )
-                  }
-                >
-                  <option value="1">
-                    Package Received
-                  </option>
-
-                  <option value="2">
-                    In Transit
-                  </option>
-
-                  <option value="3">
-                    Out for Delivery
-                  </option>
-
-                  <option value="4">
-                    Delivered
-                  </option>
-                </select>
-              </label>
-
-              <label>
-                Current location
-
-                <input
-                  type="text"
-                  value={updateLocation}
-                  onChange={(event) =>
-                    setUpdateLocation(
-                      event.target.value
-                    )
-                  }
-                  placeholder="Toledo, Ohio"
-                />
-              </label>
-
-              <label>
-                Description
-
-                <input
-                  type="text"
-                  value={updateDescription}
-                  onChange={(event) =>
-                    setUpdateDescription(
-                      event.target.value
-                    )
-                  }
-                  placeholder="Package departed the facility"
-                />
-              </label>
-
-              <button
-                type="submit"
-                disabled={
-                  isUpdating ||
-                  shipment?.currentStatus === 4
-                }
-              >
-                {isUpdating
-                  ? "Updating..."
-                  : "Update Status"}
-              </button>
-            </form>
-
-            {updateError && (
-              <p className="error-message">
-                {updateError}
-              </p>
-            )}
-
-            {updateSuccess && (
-              <div className="success-message">
-                <strong>{updateSuccess}</strong>
               </div>
             )}
           </section>
         </div>
+      )}
+
+      {canUpdateShipment && (
+        <section className="management-section">
+          <div className="section-heading">
+            <p className="eyebrow">
+              {isDriver &&
+              !canManageShipments
+                ? "Driver Tools"
+                : "Employee Tools"}
+            </p>
+
+            <h2>
+              Update shipment status
+            </h2>
+          </div>
+
+          <form
+            className="form-grid"
+            onSubmit={updateShipmentStatus}
+          >
+            <label>
+              Tracking number
+
+              <input
+                type="text"
+                value={
+                  updateTrackingNumber
+                }
+                onChange={(event) =>
+                  setUpdateTrackingNumber(
+                    event.target.value
+                  )
+                }
+                required
+              />
+            </label>
+
+            <label>
+              New status
+
+              <select
+                value={newStatus}
+                onChange={(event) =>
+                  setNewStatus(
+                    event.target.value
+                  )
+                }
+              >
+                <option value="1">
+                  Package Received
+                </option>
+
+                <option value="2">
+                  In Transit
+                </option>
+
+                <option value="3">
+                  Out for Delivery
+                </option>
+
+                <option value="4">
+                  Delivered
+                </option>
+              </select>
+            </label>
+
+            <label>
+              Current location
+
+              <input
+                type="text"
+                value={updateLocation}
+                onChange={(event) =>
+                  setUpdateLocation(
+                    event.target.value
+                  )
+                }
+                required
+              />
+            </label>
+
+            <label>
+              Description
+
+              <input
+                type="text"
+                value={updateDescription}
+                onChange={(event) =>
+                  setUpdateDescription(
+                    event.target.value
+                  )
+                }
+                required
+              />
+            </label>
+
+            <button
+              type="submit"
+              disabled={isUpdating}
+            >
+              {isUpdating
+                ? "Updating..."
+                : "Update Status"}
+            </button>
+          </form>
+
+          {updateError && (
+            <p className="error-message">
+              {updateError}
+            </p>
+          )}
+
+          {updateSuccess && (
+            <div className="success-message">
+              <strong>
+                {updateSuccess}
+              </strong>
+            </div>
+          )}
+        </section>
       )}
     </main>
   );

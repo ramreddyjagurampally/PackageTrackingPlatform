@@ -1,3 +1,6 @@
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
+
 namespace PackageTracking.Api.Models;
 
 public sealed class Shipment
@@ -17,7 +20,8 @@ public sealed class Shipment
     public ShipmentStatus CurrentStatus { get; set; } =
         ShipmentStatus.Created;
 
-    public DateTime CreatedAtUtc { get; init; } = DateTime.UtcNow;
+    public DateTime CreatedAtUtc { get; init; } =
+        DateTime.UtcNow;
 
     // Package information
     public decimal WeightKg { get; set; }
@@ -35,7 +39,18 @@ public sealed class Shipment
 
     public decimal ShippingCost { get; set; }
 
-    public string DeliveryInstructions { get; set; } = string.Empty;
+    public string DeliveryInstructions { get; set; } =
+        string.Empty;
+
+    // Driver assignment
+    public int? AssignedDriverId { get; set; }
+
+    [JsonIgnore]
+    public AppUser? AssignedDriver { get; set; }
+
+    // Display-only value. This is not saved as a database column.
+    [NotMapped]
+    public string? AssignedDriverName { get; set; }
 
     // External carrier information
     public string? CarrierSlug { get; set; }

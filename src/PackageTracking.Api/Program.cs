@@ -9,24 +9,22 @@ using PackageTracking.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Load local User Secrets even when running without a launch profile.
+// Load local development secrets.
 builder.Configuration.AddUserSecrets<Program>(optional: true);
 
-// Controllers
 builder.Services.AddControllers();
 
-// SQL Server
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     var connectionString =
-        builder.Configuration.GetConnectionString("DefaultConnection")
+        builder.Configuration.GetConnectionString(
+            "DefaultConnection")
         ?? throw new InvalidOperationException(
             "Connection string 'DefaultConnection' was not found.");
 
     options.UseSqlServer(connectionString);
 });
 
-// ASP.NET Core Identity
 builder.Services
     .AddIdentityCore<AppUser>(options =>
     {
@@ -46,11 +44,10 @@ builder.Services
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
 
-// JWT settings
 var jwtKey =
     builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException(
-        "JWT key was not found. Configure Jwt:Key using User Secrets.");
+        "JWT key was not found. Configure Jwt:Key using user secrets.");
 
 var jwtIssuer =
     builder.Configuration["Jwt:Issuer"]
@@ -60,7 +57,6 @@ var jwtAudience =
     builder.Configuration["Jwt:Audience"]
     ?? "PackageTracking.Web";
 
-// JWT authentication
 builder.Services
     .AddAuthentication(options =>
     {
@@ -93,7 +89,6 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
-// AfterShip integration
 builder.Services.AddHttpClient<AfterShipTrackingService>(client =>
 {
     var baseUrl =
@@ -108,7 +103,6 @@ builder.Services.AddHttpClient<AfterShipTrackingService>(client =>
     }
 });
 
-// React frontend access
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
@@ -122,7 +116,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Create roles and assign Admin role to the configured user.
+// Create application roles when the API starts.
 using (var scope = app.Services.CreateScope())
 {
     var roleManager =
@@ -130,94 +124,39 @@ using (var scope = app.Services.CreateScope())
             .GetRequiredService<
                 RoleManager<IdentityRole<int>>>();
 
-    var userManager =
-        scope.ServiceProvider
-            .GetRequiredService<UserManager<AppUser>>();
-
     var roleNames = new[]
     {
         "Customer",
         "Employee",
+        "Driver",
         "Admin"
     };
 
     foreach (var roleName in roleNames)
     {
-        var roleExists =
-            await roleManager.RoleExistsAsync(roleName);
-
-        if (!roleExists)
+        if (!await roleManager.RoleExistsAsync(roleName))
         {
-            var roleResult =
+            var result =
                 await roleManager.CreateAsync(
                     new IdentityRole<int>
                     {
                         Name = roleName
                     });
 
-            if (!roleResult.Succeeded)
+            if (!result.Succeeded)
             {
                 var errors = string.Join(
                     ", ",
-                    roleResult.Errors.Select(
+                    result.Errors.Select(
                         error => error.Description));
 
                 throw new InvalidOperationException(
-                    $"Could not create role '{roleName}': {errors}");
-            }
-        }
-    }
-
-    var adminEmail =
-        app.Configuration["Admin:Email"];
-
-    if (!string.IsNullOrWhiteSpace(adminEmail))
-    {
-        var normalizedAdminEmail =
-            adminEmail.Trim().ToLowerInvariant();
-
-        var adminUser =
-            await userManager.FindByEmailAsync(
-                normalizedAdminEmail);
-
-        if (adminUser is null)
-        {
-            Console.WriteLine(
-                $"Admin account '{normalizedAdminEmail}' was not found.");
-        }
-        else
-        {
-            var alreadyAdmin =
-                await userManager.IsInRoleAsync(
-                    adminUser,
-                    "Admin");
-
-            if (!alreadyAdmin)
-            {
-                var adminRoleResult =
-                    await userManager.AddToRoleAsync(
-                        adminUser,
-                        "Admin");
-
-                if (!adminRoleResult.Succeeded)
-                {
-                    var errors = string.Join(
-                        ", ",
-                        adminRoleResult.Errors.Select(
-                            error => error.Description));
-
-                    throw new InvalidOperationException(
-                        $"Could not assign Admin role: {errors}");
-                }
-
-                Console.WriteLine(
-                    $"Admin role assigned to {normalizedAdminEmail}.");
+                    $"Could not create role {roleName}: {errors}");
             }
         }
     }
 }
 
-// HTTP pipeline
 app.UseCors("Frontend");
 
 app.UseAuthentication();
@@ -228,7 +167,8 @@ app.MapControllers();
 app.MapGet("/", () =>
     Results.Ok(new
     {
-        message = "Package Tracking API is running"
+        message =
+            "Package Tracking API is running"
     }));
 
 app.Run();

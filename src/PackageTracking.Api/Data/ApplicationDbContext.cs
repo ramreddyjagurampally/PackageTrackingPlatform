@@ -56,5 +56,11 @@ public sealed class ApplicationDbContext
         builder.Entity<Shipment>()
             .Property(shipment => shipment.DeliveryInstructions)
             .HasMaxLength(500);
+
+        builder.Entity<Shipment>()
+            .HasOne(shipment => shipment.AssignedDriver)
+            .WithMany(driver => driver.AssignedShipments)
+            .HasForeignKey(shipment => shipment.AssignedDriverId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
