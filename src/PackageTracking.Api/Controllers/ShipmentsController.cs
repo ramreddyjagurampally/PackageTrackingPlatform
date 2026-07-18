@@ -22,6 +22,7 @@ public sealed class ShipmentsController : ControllerBase
         _afterShipTrackingService = afterShipTrackingService;
     }
 
+    // GET: api/shipments
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Shipment>>> GetAll()
     {
@@ -33,6 +34,7 @@ public sealed class ShipmentsController : ControllerBase
         return Ok(shipments);
     }
 
+    // GET: api/shipments/{trackingNumber}
     [HttpGet("{trackingNumber}")]
     public async Task<ActionResult<Shipment>> GetByTrackingNumber(
         string trackingNumber)
@@ -61,6 +63,7 @@ public sealed class ShipmentsController : ControllerBase
         return Ok(shipment);
     }
 
+    // POST: api/shipments
     [HttpPost]
     public async Task<ActionResult<Shipment>> Create(
         CreateShipmentRequest request)
@@ -127,6 +130,7 @@ public sealed class ShipmentsController : ControllerBase
             shipment);
     }
 
+    // PUT: api/shipments/{trackingNumber}/status
     [HttpPut("{trackingNumber}/status")]
     public async Task<ActionResult> UpdateStatus(
         string trackingNumber,
@@ -164,14 +168,46 @@ public sealed class ShipmentsController : ControllerBase
             });
         }
 
+        if (!IsValidStatusTransition(
+                shipment.CurrentStatus,
+                newStatus))
+        {
+            return BadRequest(new
+            {
+                message =
+                    $"A shipment cannot move from " +
+                    $"{GetStatusDisplayName(shipment.CurrentStatus)} to " +
+                    $"{GetStatusDisplayName(newStatus)}."
+            });
+        }
+
+        var location = request.Location?.Trim() ?? string.Empty;
+        var description = request.Description?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(location))
+        {
+            return BadRequest(new
+            {
+                message = "A current shipment location is required."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            return BadRequest(new
+            {
+                message = "A tracking description is required."
+            });
+        }
+
         shipment.CurrentStatus = newStatus;
 
         var trackingEvent = new ShipmentTrackingEvent
         {
             ShipmentId = shipment.Id,
             Status = newStatus,
-            Location = request.Location.Trim(),
-            Description = request.Description.Trim()
+            Location = location,
+            Description = description
         };
 
         _dbContext.ShipmentTrackingEvents.Add(trackingEvent);
@@ -179,16 +215,21 @@ public sealed class ShipmentsController : ControllerBase
 
         return Ok(new
         {
+            message =
+                $"Shipment updated to {GetStatusDisplayName(newStatus)}.",
+
             shipment.Id,
             shipment.TrackingNumber,
             shipment.CarrierSlug,
             shipment.CarrierTrackingNumber,
             shipment.UsesCarrierTracking,
             shipment.CurrentStatus,
+
             TrackingEvent = trackingEvent
         });
     }
 
+    // POST: api/shipments/{trackingNumber}/register-carrier
     [HttpPost("{trackingNumber}/register-carrier")]
     public async Task<IActionResult> RegisterCarrierTracking(
         string trackingNumber,
@@ -232,6 +273,60 @@ public sealed class ShipmentsController : ControllerBase
             StatusCode = (int)result.StatusCode,
             ContentType = "application/json",
             Content = result.ResponseBody
+        };
+    }
+
+    private static bool IsValidStatusTransition(
+        ShipmentStatus currentStatus,
+        ShipmentStatus newStatus)
+    {
+        return (currentStatus, newStatus) switch
+        {
+            (
+                ShipmentStatus.Created,
+                ShipmentStatus.PackageReceived
+            ) => true,
+
+            (
+                ShipmentStatus.PackageReceived,
+                ShipmentStatus.InTransit
+            ) => true,
+
+            (
+                ShipmentStatus.InTransit,
+                ShipmentStatus.OutForDelivery
+            ) => true,
+
+            (
+                ShipmentStatus.OutForDelivery,
+                ShipmentStatus.Delivered
+            ) => true,
+
+            _ => false
+        };
+    }
+
+    private static string GetStatusDisplayName(
+        ShipmentStatus status)
+    {
+        return status switch
+        {
+            ShipmentStatus.Created =>
+                "Created",
+
+            ShipmentStatus.PackageReceived =>
+                "Package Received",
+
+            ShipmentStatus.InTransit =>
+                "In Transit",
+
+            ShipmentStatus.OutForDelivery =>
+                "Out for Delivery",
+
+            ShipmentStatus.Delivered =>
+                "Delivered",
+
+            _ => status.ToString()
         };
     }
 
