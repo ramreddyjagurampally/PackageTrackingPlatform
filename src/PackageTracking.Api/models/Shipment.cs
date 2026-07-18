@@ -19,9 +19,13 @@ public sealed class Shipment
 
     public DateTime CreatedAtUtc { get; init; } = DateTime.UtcNow;
 
+    public string? CarrierSlug { get; set; }
+
+    public string? CarrierTrackingNumber { get; set; }
+
+    public bool UsesCarrierTracking { get; set; }
+
     public ICollection<ShipmentTrackingEvent> TrackingHistory { get; set; } =
         new List<ShipmentTrackingEvent>();
 }
-
-
   

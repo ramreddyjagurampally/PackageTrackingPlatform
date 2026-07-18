@@ -1,46 +1,27 @@
 using Microsoft.EntityFrameworkCore;
 using PackageTracking.Api.Data;
+using PackageTracking.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add controllers.
 builder.Services.AddControllers();
 
-// Connect Entity Framework Core to SQL Server.
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Allow the React frontend to call the API.
-builder.Services.AddCors(options =>
+builder.Services.AddHttpClient<AfterShipTrackingService>(client =>
 {
-    options.AddPolicy("ReactFrontend", policy =>
+    var baseUrl = builder.Configuration["AfterShip:BaseUrl"];
+
+    if (string.IsNullOrWhiteSpace(baseUrl))
     {
-        policy
-            .WithOrigins(
-                "http://localhost:5173",
-                "http://localhost:5174")
-            .AllowAnyHeader()
-            .AllowAnyMethod();
-    });
+        throw new InvalidOperationException(
+            "The AfterShip base URL is not configured.");
+    }
+
+    client.BaseAddress = new Uri(
+        baseUrl.EndsWith("/")
+            ? baseUrl
+            : $"{baseUrl}/");
 });
-
-// Add OpenAPI support.
-builder.Services.AddOpenApi();
-
-var app = builder.Build();
-
-// Enable OpenAPI during development.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
-
-// Apply the React CORS policy.
-app.UseCors("ReactFrontend");
-
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.Run();

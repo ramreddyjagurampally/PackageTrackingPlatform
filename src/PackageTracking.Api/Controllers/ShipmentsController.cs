@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using PackageTracking.Api.Data;
 using PackageTracking.Api.Dtos;
 using PackageTracking.Api.Models;
+using PackageTracking.Api.Services;
 
 namespace PackageTracking.Api.Controllers;
 
@@ -11,10 +12,14 @@ namespace PackageTracking.Api.Controllers;
 public sealed class ShipmentsController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly AfterShipTrackingService _afterShipTrackingService;
 
-    public ShipmentsController(ApplicationDbContext dbContext)
+    public ShipmentsController(
+        ApplicationDbContext dbContext,
+        AfterShipTrackingService afterShipTrackingService)
     {
         _dbContext = dbContext;
+        _afterShipTrackingService = afterShipTrackingService;
     }
 
     [HttpGet]
@@ -32,11 +37,13 @@ public sealed class ShipmentsController : ControllerBase
     public async Task<ActionResult<Shipment>> GetByTrackingNumber(
         string trackingNumber)
     {
+        var cleanedTrackingNumber = trackingNumber.Trim();
+
         var shipment = await _dbContext.Shipments
             .AsNoTracking()
             .Include(shipment => shipment.TrackingHistory)
             .FirstOrDefaultAsync(shipment =>
-                shipment.TrackingNumber == trackingNumber);
+                shipment.TrackingNumber == cleanedTrackingNumber);
 
         if (shipment is null)
         {
@@ -58,13 +65,39 @@ public sealed class ShipmentsController : ControllerBase
     public async Task<ActionResult<Shipment>> Create(
         CreateShipmentRequest request)
     {
+        var hasCarrierSlug =
+            !string.IsNullOrWhiteSpace(request.CarrierSlug);
+
+        var hasCarrierTrackingNumber =
+            !string.IsNullOrWhiteSpace(request.CarrierTrackingNumber);
+
+        if (hasCarrierSlug != hasCarrierTrackingNumber)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Carrier and carrier tracking number must be provided together."
+            });
+        }
+
         var shipment = new Shipment
         {
             TrackingNumber = GenerateTrackingNumber(),
-            SenderName = request.SenderName,
-            RecipientName = request.RecipientName,
-            Origin = request.Origin,
-            Destination = request.Destination
+            SenderName = request.SenderName.Trim(),
+            RecipientName = request.RecipientName.Trim(),
+            Origin = request.Origin.Trim(),
+            Destination = request.Destination.Trim(),
+
+            CarrierSlug = hasCarrierSlug
+                ? request.CarrierSlug!.Trim().ToLowerInvariant()
+                : null,
+
+            CarrierTrackingNumber = hasCarrierTrackingNumber
+                ? request.CarrierTrackingNumber!.Trim()
+                : null,
+
+            UsesCarrierTracking =
+                hasCarrierSlug && hasCarrierTrackingNumber
         };
 
         _dbContext.Shipments.Add(shipment);
@@ -74,16 +107,23 @@ public sealed class ShipmentsController : ControllerBase
         {
             ShipmentId = shipment.Id,
             Status = ShipmentStatus.Created,
-            Location = request.Origin,
-            Description = "Shipment was created."
+            Location = shipment.Origin,
+            Description = shipment.UsesCarrierTracking
+                ? $"Shipment created with carrier {shipment.CarrierSlug}."
+                : "Shipment was created."
         };
 
         _dbContext.ShipmentTrackingEvents.Add(trackingEvent);
         await _dbContext.SaveChangesAsync();
 
+        shipment.TrackingHistory.Add(trackingEvent);
+
         return CreatedAtAction(
             nameof(GetByTrackingNumber),
-            new { trackingNumber = shipment.TrackingNumber },
+            new
+            {
+                trackingNumber = shipment.TrackingNumber
+            },
             shipment);
     }
 
@@ -92,9 +132,11 @@ public sealed class ShipmentsController : ControllerBase
         string trackingNumber,
         UpdateShipmentStatusRequest request)
     {
+        var cleanedTrackingNumber = trackingNumber.Trim();
+
         var shipment = await _dbContext.Shipments
             .FirstOrDefaultAsync(shipment =>
-                shipment.TrackingNumber == trackingNumber);
+                shipment.TrackingNumber == cleanedTrackingNumber);
 
         if (shipment is null)
         {
@@ -128,21 +170,69 @@ public sealed class ShipmentsController : ControllerBase
         {
             ShipmentId = shipment.Id,
             Status = newStatus,
-            Location = request.Location,
-            Description = request.Description
+            Location = request.Location.Trim(),
+            Description = request.Description.Trim()
         };
 
         _dbContext.ShipmentTrackingEvents.Add(trackingEvent);
-
         await _dbContext.SaveChangesAsync();
 
         return Ok(new
         {
             shipment.Id,
             shipment.TrackingNumber,
+            shipment.CarrierSlug,
+            shipment.CarrierTrackingNumber,
+            shipment.UsesCarrierTracking,
             shipment.CurrentStatus,
             TrackingEvent = trackingEvent
         });
+    }
+
+    [HttpPost("{trackingNumber}/register-carrier")]
+    public async Task<IActionResult> RegisterCarrierTracking(
+        string trackingNumber,
+        CancellationToken cancellationToken)
+    {
+        var cleanedTrackingNumber = trackingNumber.Trim();
+
+        var shipment = await _dbContext.Shipments
+            .FirstOrDefaultAsync(
+                shipment =>
+                    shipment.TrackingNumber == cleanedTrackingNumber,
+                cancellationToken);
+
+        if (shipment is null)
+        {
+            return NotFound(new
+            {
+                message = "Shipment not found."
+            });
+        }
+
+        if (!shipment.UsesCarrierTracking ||
+            string.IsNullOrWhiteSpace(shipment.CarrierSlug) ||
+            string.IsNullOrWhiteSpace(
+                shipment.CarrierTrackingNumber))
+        {
+            return BadRequest(new
+            {
+                message =
+                    "This shipment does not have complete carrier information."
+            });
+        }
+
+        var result =
+            await _afterShipTrackingService.RegisterTrackingAsync(
+                shipment,
+                cancellationToken);
+
+        return new ContentResult
+        {
+            StatusCode = (int)result.StatusCode,
+            ContentType = "application/json",
+            Content = result.ResponseBody
+        };
     }
 
     private static string GenerateTrackingNumber()
