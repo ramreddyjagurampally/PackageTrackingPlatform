@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PackageTracking.Api.Data;
@@ -9,6 +10,7 @@ namespace PackageTracking.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = "Employee,Admin")]
 public sealed class ShipmentsController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
@@ -22,7 +24,8 @@ public sealed class ShipmentsController : ControllerBase
         _afterShipTrackingService = afterShipTrackingService;
     }
 
-    // GET: api/shipments
+    // Employee/Admin only:
+    // GET api/shipments
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Shipment>>> GetAll()
     {
@@ -34,12 +37,22 @@ public sealed class ShipmentsController : ControllerBase
         return Ok(shipments);
     }
 
-    // GET: api/shipments/{trackingNumber}
+    // Public:
+    // GET api/shipments/{trackingNumber}
+    [AllowAnonymous]
     [HttpGet("{trackingNumber}")]
     public async Task<ActionResult<Shipment>> GetByTrackingNumber(
         string trackingNumber)
     {
         var cleanedTrackingNumber = trackingNumber.Trim();
+
+        if (string.IsNullOrWhiteSpace(cleanedTrackingNumber))
+        {
+            return BadRequest(new
+            {
+                message = "A tracking number is required."
+            });
+        }
 
         var shipment = await _dbContext.Shipments
             .AsNoTracking()
@@ -63,16 +76,37 @@ public sealed class ShipmentsController : ControllerBase
         return Ok(shipment);
     }
 
-    // POST: api/shipments
+    // Employee/Admin only:
+    // POST api/shipments
     [HttpPost]
     public async Task<ActionResult<Shipment>> Create(
         CreateShipmentRequest request)
     {
+        var senderName = request.SenderName?.Trim() ?? string.Empty;
+        var recipientName =
+            request.RecipientName?.Trim() ?? string.Empty;
+        var origin = request.Origin?.Trim() ?? string.Empty;
+        var destination =
+            request.Destination?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(senderName) ||
+            string.IsNullOrWhiteSpace(recipientName) ||
+            string.IsNullOrWhiteSpace(origin) ||
+            string.IsNullOrWhiteSpace(destination))
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Sender, recipient, origin, and destination are required."
+            });
+        }
+
         var hasCarrierSlug =
             !string.IsNullOrWhiteSpace(request.CarrierSlug);
 
         var hasCarrierTrackingNumber =
-            !string.IsNullOrWhiteSpace(request.CarrierTrackingNumber);
+            !string.IsNullOrWhiteSpace(
+                request.CarrierTrackingNumber);
 
         if (hasCarrierSlug != hasCarrierTrackingNumber)
         {
@@ -86,21 +120,27 @@ public sealed class ShipmentsController : ControllerBase
         var shipment = new Shipment
         {
             TrackingNumber = GenerateTrackingNumber(),
-            SenderName = request.SenderName.Trim(),
-            RecipientName = request.RecipientName.Trim(),
-            Origin = request.Origin.Trim(),
-            Destination = request.Destination.Trim(),
+            SenderName = senderName,
+            RecipientName = recipientName,
+            Origin = origin,
+            Destination = destination,
 
             CarrierSlug = hasCarrierSlug
-                ? request.CarrierSlug!.Trim().ToLowerInvariant()
+                ? request.CarrierSlug!
+                    .Trim()
+                    .ToLowerInvariant()
                 : null,
 
-            CarrierTrackingNumber = hasCarrierTrackingNumber
-                ? request.CarrierTrackingNumber!.Trim()
-                : null,
+            CarrierTrackingNumber =
+                hasCarrierTrackingNumber
+                    ? request.CarrierTrackingNumber!.Trim()
+                    : null,
 
             UsesCarrierTracking =
-                hasCarrierSlug && hasCarrierTrackingNumber
+                hasCarrierSlug &&
+                hasCarrierTrackingNumber,
+
+            CurrentStatus = ShipmentStatus.Created
         };
 
         _dbContext.Shipments.Add(shipment);
@@ -130,13 +170,22 @@ public sealed class ShipmentsController : ControllerBase
             shipment);
     }
 
-    // PUT: api/shipments/{trackingNumber}/status
+    // Employee/Admin only:
+    // PUT api/shipments/{trackingNumber}/status
     [HttpPut("{trackingNumber}/status")]
     public async Task<ActionResult> UpdateStatus(
         string trackingNumber,
         UpdateShipmentStatusRequest request)
     {
         var cleanedTrackingNumber = trackingNumber.Trim();
+
+        if (string.IsNullOrWhiteSpace(cleanedTrackingNumber))
+        {
+            return BadRequest(new
+            {
+                message = "A tracking number is required."
+            });
+        }
 
         var shipment = await _dbContext.Shipments
             .FirstOrDefaultAsync(shipment =>
@@ -181,14 +230,18 @@ public sealed class ShipmentsController : ControllerBase
             });
         }
 
-        var location = request.Location?.Trim() ?? string.Empty;
-        var description = request.Description?.Trim() ?? string.Empty;
+        var location =
+            request.Location?.Trim() ?? string.Empty;
+
+        var description =
+            request.Description?.Trim() ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(location))
         {
             return BadRequest(new
             {
-                message = "A current shipment location is required."
+                message =
+                    "A current shipment location is required."
             });
         }
 
@@ -196,7 +249,8 @@ public sealed class ShipmentsController : ControllerBase
         {
             return BadRequest(new
             {
-                message = "A tracking description is required."
+                message =
+                    "A tracking description is required."
             });
         }
 
@@ -216,7 +270,8 @@ public sealed class ShipmentsController : ControllerBase
         return Ok(new
         {
             message =
-                $"Shipment updated to {GetStatusDisplayName(newStatus)}.",
+                $"Shipment updated to " +
+                $"{GetStatusDisplayName(newStatus)}.",
 
             shipment.Id,
             shipment.TrackingNumber,
@@ -229,7 +284,8 @@ public sealed class ShipmentsController : ControllerBase
         });
     }
 
-    // POST: api/shipments/{trackingNumber}/register-carrier
+    // Employee/Admin only:
+    // POST api/shipments/{trackingNumber}/register-carrier
     [HttpPost("{trackingNumber}/register-carrier")]
     public async Task<IActionResult> RegisterCarrierTracking(
         string trackingNumber,
@@ -237,10 +293,19 @@ public sealed class ShipmentsController : ControllerBase
     {
         var cleanedTrackingNumber = trackingNumber.Trim();
 
+        if (string.IsNullOrWhiteSpace(cleanedTrackingNumber))
+        {
+            return BadRequest(new
+            {
+                message = "A tracking number is required."
+            });
+        }
+
         var shipment = await _dbContext.Shipments
             .FirstOrDefaultAsync(
                 shipment =>
-                    shipment.TrackingNumber == cleanedTrackingNumber,
+                    shipment.TrackingNumber ==
+                    cleanedTrackingNumber,
                 cancellationToken);
 
         if (shipment is null)
@@ -264,9 +329,10 @@ public sealed class ShipmentsController : ControllerBase
         }
 
         var result =
-            await _afterShipTrackingService.RegisterTrackingAsync(
-                shipment,
-                cancellationToken);
+            await _afterShipTrackingService
+                .RegisterTrackingAsync(
+                    shipment,
+                    cancellationToken);
 
         return new ContentResult
         {
