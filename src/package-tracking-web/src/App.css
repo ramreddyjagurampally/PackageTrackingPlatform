@@ -511,3 +511,17 @@ button:hover:not(:disabled) {
     gap: 4px;
   }
 }
+.status-delayed {
+  color: #8b4200;
+  background: #ffe5cc;
+}
+
+.status-damaged {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.status-cancelled {
+  color: #5f1a1a;
+  background: #f5dada;
+}

@@ -26,7 +26,7 @@ public sealed class ShipmentsController : ControllerBase
         _afterShipTrackingService = afterShipTrackingService;
     }
 
-    // Employees and administrators can view all shipments.
+    // Employees and administrators can view every shipment.
     [HttpGet]
     [Authorize(Roles = "Employee,Admin")]
     public async Task<ActionResult<IEnumerable<Shipment>>> GetAll()
@@ -46,7 +46,7 @@ public sealed class ShipmentsController : ControllerBase
         return Ok(shipments);
     }
 
-    // Anyone can track a shipment using its tracking number.
+    // Public tracking endpoint.
     [AllowAnonymous]
     [HttpGet("{trackingNumber}")]
     public async Task<ActionResult<Shipment>> GetByTrackingNumber(
@@ -65,6 +65,7 @@ public sealed class ShipmentsController : ControllerBase
 
         var shipment = await _dbContext.Shipments
             .AsNoTracking()
+            .Include(shipment => shipment.AssignedDriver)
             .Include(shipment => shipment.TrackingHistory)
             .FirstOrDefaultAsync(shipment =>
                 shipment.TrackingNumber ==
@@ -77,6 +78,9 @@ public sealed class ShipmentsController : ControllerBase
                 message = "Shipment not found."
             });
         }
+
+        shipment.AssignedDriverName =
+            shipment.AssignedDriver?.FullName;
 
         shipment.TrackingHistory =
             shipment.TrackingHistory
@@ -94,20 +98,20 @@ public sealed class ShipmentsController : ControllerBase
         CreateShipmentRequest request)
     {
         var senderName =
-            request.SenderName?.Trim()
-            ?? string.Empty;
+            request.SenderName?.Trim() ??
+            string.Empty;
 
         var recipientName =
-            request.RecipientName?.Trim()
-            ?? string.Empty;
+            request.RecipientName?.Trim() ??
+            string.Empty;
 
         var origin =
-            request.Origin?.Trim()
-            ?? string.Empty;
+            request.Origin?.Trim() ??
+            string.Empty;
 
         var destination =
-            request.Destination?.Trim()
-            ?? string.Empty;
+            request.Destination?.Trim() ??
+            string.Empty;
 
         if (string.IsNullOrWhiteSpace(senderName) ||
             string.IsNullOrWhiteSpace(recipientName) ||
@@ -171,20 +175,35 @@ public sealed class ShipmentsController : ControllerBase
             TrackingNumber =
                 GenerateTrackingNumber(),
 
-            SenderName = senderName,
-            RecipientName = recipientName,
-            Origin = origin,
-            Destination = destination,
+            SenderName =
+                senderName,
+
+            RecipientName =
+                recipientName,
+
+            Origin =
+                origin,
+
+            Destination =
+                destination,
 
             CurrentStatus =
                 ShipmentStatus.Created,
 
-            WeightKg = request.WeightKg,
-            LengthCm = request.LengthCm,
-            WidthCm = request.WidthCm,
-            HeightCm = request.HeightCm,
+            WeightKg =
+                request.WeightKg,
 
-            ServiceLevel = serviceLevel,
+            LengthCm =
+                request.LengthCm,
+
+            WidthCm =
+                request.WidthCm,
+
+            HeightCm =
+                request.HeightCm,
+
+            ServiceLevel =
+                serviceLevel,
 
             EstimatedDeliveryDateUtc =
                 CalculateEstimatedDeliveryDate(
@@ -227,7 +246,8 @@ public sealed class ShipmentsController : ControllerBase
         var trackingEvent =
             new ShipmentTrackingEvent
             {
-                ShipmentId = shipment.Id,
+                ShipmentId =
+                    shipment.Id,
 
                 Status =
                     ShipmentStatus.Created,
@@ -236,7 +256,7 @@ public sealed class ShipmentsController : ControllerBase
                     shipment.Origin,
 
                 Description =
-                    $"Shipment was created with " +
+                    $"Label created with " +
                     $"{GetServiceLevelDisplayName(serviceLevel)} service."
             };
 
@@ -293,7 +313,7 @@ public sealed class ShipmentsController : ControllerBase
             });
         }
 
-        // Drivers can update only shipments assigned to them.
+        // A driver can update only packages assigned to them.
         if (User.IsInRole("Driver") &&
             !User.IsInRole("Admin") &&
             !User.IsInRole("Employee"))
@@ -323,13 +343,16 @@ public sealed class ShipmentsController : ControllerBase
             }
         }
 
-        if (shipment.CurrentStatus ==
-            ShipmentStatus.Delivered)
+        // Delivered and cancelled shipments are final.
+        if (shipment.CurrentStatus is
+            ShipmentStatus.Delivered or
+            ShipmentStatus.Cancelled)
         {
             return BadRequest(new
             {
                 message =
-                    "A delivered shipment cannot receive more updates."
+                    $"{GetStatusDisplayName(shipment.CurrentStatus)} " +
+                    "is a final status and cannot receive more updates."
             });
         }
 
@@ -368,12 +391,12 @@ public sealed class ShipmentsController : ControllerBase
         }
 
         var location =
-            request.Location?.Trim()
-            ?? string.Empty;
+            request.Location?.Trim() ??
+            string.Empty;
 
         var description =
-            request.Description?.Trim()
-            ?? string.Empty;
+            request.Description?.Trim() ??
+            string.Empty;
 
         if (string.IsNullOrWhiteSpace(location))
         {
@@ -414,10 +437,17 @@ public sealed class ShipmentsController : ControllerBase
         var trackingEvent =
             new ShipmentTrackingEvent
             {
-                ShipmentId = shipment.Id,
-                Status = newStatus,
-                Location = location,
-                Description = description
+                ShipmentId =
+                    shipment.Id,
+
+                Status =
+                    newStatus,
+
+                Location =
+                    location,
+
+                Description =
+                    description
             };
 
         _dbContext.ShipmentTrackingEvents.Add(
@@ -441,7 +471,7 @@ public sealed class ShipmentsController : ControllerBase
     }
 
     // Employees and administrators can register
-    // an external carrier tracking number.
+    // external carrier tracking.
     [HttpPost("{trackingNumber}/register-carrier")]
     [Authorize(Roles = "Employee,Admin")]
     public async Task<IActionResult> RegisterCarrierTracking(
@@ -503,6 +533,48 @@ public sealed class ShipmentsController : ControllerBase
         ShipmentStatus currentStatus,
         ShipmentStatus newStatus)
     {
+        // Delivered and cancelled are final.
+        if (currentStatus is
+            ShipmentStatus.Delivered or
+            ShipmentStatus.Cancelled)
+        {
+            return false;
+        }
+
+        // Damaged packages can only be cancelled afterward.
+        if (currentStatus ==
+            ShipmentStatus.Damaged)
+        {
+            return newStatus ==
+                ShipmentStatus.Cancelled;
+        }
+
+        // Delayed packages can return to an active stage.
+        if (currentStatus ==
+            ShipmentStatus.Delayed)
+        {
+            return newStatus is
+                ShipmentStatus.PackageReceived or
+                ShipmentStatus.ArrivedAtOriginFacility or
+                ShipmentStatus.DepartedOriginFacility or
+                ShipmentStatus.InTransit or
+                ShipmentStatus.ArrivedAtDestinationFacility or
+                ShipmentStatus.OutForDelivery or
+                ShipmentStatus.DeliveryAttempted or
+                ShipmentStatus.Delivered or
+                ShipmentStatus.Damaged or
+                ShipmentStatus.Cancelled;
+        }
+
+        // Active shipments can be delayed, damaged, or cancelled.
+        if (newStatus is
+            ShipmentStatus.Delayed or
+            ShipmentStatus.Damaged or
+            ShipmentStatus.Cancelled)
+        {
+            return true;
+        }
+
         return (currentStatus, newStatus) switch
         {
             (
@@ -512,16 +584,58 @@ public sealed class ShipmentsController : ControllerBase
 
             (
                 ShipmentStatus.PackageReceived,
+                ShipmentStatus.ArrivedAtOriginFacility
+            ) => true,
+
+            // Keep support for the original shorter workflow.
+            (
+                ShipmentStatus.PackageReceived,
                 ShipmentStatus.InTransit
             ) => true,
 
+            (
+                ShipmentStatus.ArrivedAtOriginFacility,
+                ShipmentStatus.DepartedOriginFacility
+            ) => true,
+
+            (
+                ShipmentStatus.DepartedOriginFacility,
+                ShipmentStatus.InTransit
+            ) => true,
+
+            (
+                ShipmentStatus.InTransit,
+                ShipmentStatus.ArrivedAtDestinationFacility
+            ) => true,
+
+            // Keep support for the original shorter workflow.
             (
                 ShipmentStatus.InTransit,
                 ShipmentStatus.OutForDelivery
             ) => true,
 
             (
+                ShipmentStatus.ArrivedAtDestinationFacility,
+                ShipmentStatus.OutForDelivery
+            ) => true,
+
+            (
                 ShipmentStatus.OutForDelivery,
+                ShipmentStatus.DeliveryAttempted
+            ) => true,
+
+            (
+                ShipmentStatus.OutForDelivery,
+                ShipmentStatus.Delivered
+            ) => true,
+
+            (
+                ShipmentStatus.DeliveryAttempted,
+                ShipmentStatus.OutForDelivery
+            ) => true,
+
+            (
+                ShipmentStatus.DeliveryAttempted,
                 ShipmentStatus.Delivered
             ) => true,
 
@@ -626,7 +740,7 @@ public sealed class ShipmentsController : ControllerBase
         return status switch
         {
             ShipmentStatus.Created =>
-                "Created",
+                "Label Created",
 
             ShipmentStatus.PackageReceived =>
                 "Package Received",
@@ -639,6 +753,27 @@ public sealed class ShipmentsController : ControllerBase
 
             ShipmentStatus.Delivered =>
                 "Delivered",
+
+            ShipmentStatus.ArrivedAtOriginFacility =>
+                "Arrived at Origin Facility",
+
+            ShipmentStatus.DepartedOriginFacility =>
+                "Departed Origin Facility",
+
+            ShipmentStatus.ArrivedAtDestinationFacility =>
+                "Arrived at Destination Facility",
+
+            ShipmentStatus.DeliveryAttempted =>
+                "Delivery Attempted",
+
+            ShipmentStatus.Delayed =>
+                "Delayed",
+
+            ShipmentStatus.Damaged =>
+                "Damaged",
+
+            ShipmentStatus.Cancelled =>
+                "Cancelled",
 
             _ =>
                 status.ToString()

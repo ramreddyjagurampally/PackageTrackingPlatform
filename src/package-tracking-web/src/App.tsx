@@ -64,11 +64,33 @@ type ApiError = {
 const apiBaseUrl = "http://localhost:5133";
 
 const statusNames = [
-  "Created",
+  "Label Created",
   "Package Received",
   "In Transit",
   "Out for Delivery",
   "Delivered",
+  "Arrived at Origin Facility",
+  "Departed Origin Facility",
+  "Arrived at Destination Facility",
+  "Delivery Attempted",
+  "Delayed",
+  "Damaged",
+  "Cancelled",
+];
+
+const statusOptions = [
+  { value: 0, label: "Label Created" },
+  { value: 1, label: "Package Received" },
+  { value: 5, label: "Arrived at Origin Facility" },
+  { value: 6, label: "Departed Origin Facility" },
+  { value: 2, label: "In Transit" },
+  { value: 7, label: "Arrived at Destination Facility" },
+  { value: 3, label: "Out for Delivery" },
+  { value: 8, label: "Delivery Attempted" },
+  { value: 4, label: "Delivered" },
+  { value: 9, label: "Delayed" },
+  { value: 10, label: "Damaged" },
+  { value: 11, label: "Cancelled" },
 ];
 
 const serviceNames = [
@@ -86,27 +108,20 @@ function readSavedAuth(): AuthResponse | null {
   }
 
   try {
-    const parsed =
+    const parsedAuth =
       JSON.parse(savedAuth) as AuthResponse;
 
     if (
-      parsed.expiresAtUtc &&
-      new Date(parsed.expiresAtUtc) <=
-        new Date()
+      parsedAuth.expiresAtUtc &&
+      new Date(parsedAuth.expiresAtUtc) <= new Date()
     ) {
-      localStorage.removeItem(
-        "packageTrackingAuth"
-      );
-
+      localStorage.removeItem("packageTrackingAuth");
       return null;
     }
 
-    return parsed;
+    return parsedAuth;
   } catch {
-    localStorage.removeItem(
-      "packageTrackingAuth"
-    );
-
+    localStorage.removeItem("packageTrackingAuth");
     return null;
   }
 }
@@ -116,10 +131,10 @@ async function readErrorMessage(
   fallbackMessage: string
 ): Promise<string> {
   try {
-    const data =
+    const errorData =
       (await response.json()) as ApiError;
 
-    return data.message || fallbackMessage;
+    return errorData.message || fallbackMessage;
   } catch {
     return fallbackMessage;
   }
@@ -127,70 +142,45 @@ async function readErrorMessage(
 
 function App() {
   const [auth, setAuth] =
-    useState<AuthResponse | null>(
-      readSavedAuth
-    );
+    useState<AuthResponse | null>(readSavedAuth);
 
-  const [loginEmail, setLoginEmail] =
-    useState("");
+  // Login
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  const [loginPassword, setLoginPassword] =
-    useState("");
-
-  const [loginError, setLoginError] =
-    useState("");
-
-  const [isLoggingIn, setIsLoggingIn] =
-    useState(false);
-
-  const [trackingNumber, setTrackingNumber] =
-    useState("");
-
+  // Public tracking
+  const [trackingNumber, setTrackingNumber] = useState("");
   const [shipment, setShipment] =
     useState<Shipment | null>(null);
+  const [trackingError, setTrackingError] = useState("");
+  const [isTracking, setIsTracking] = useState(false);
 
-  const [trackingError, setTrackingError] =
-    useState("");
-
-  const [isTracking, setIsTracking] =
-    useState(false);
-
+  // Dashboard
   const [shipments, setShipments] =
     useState<Shipment[]>([]);
-
   const [drivers, setDrivers] =
     useState<Driver[]>([]);
-
   const [dashboardSearch, setDashboardSearch] =
     useState("");
-
   const [dashboardStatus, setDashboardStatus] =
     useState("all");
-
   const [dashboardError, setDashboardError] =
     useState("");
-
   const [
     isLoadingDashboard,
     setIsLoadingDashboard,
   ] = useState(false);
 
-  // Create driver
-  const [driverName, setDriverName] =
-    useState("");
-
-  const [driverEmail, setDriverEmail] =
-    useState("");
-
+  // Driver creation
+  const [driverName, setDriverName] = useState("");
+  const [driverEmail, setDriverEmail] = useState("");
   const [driverPassword, setDriverPassword] =
     useState("");
-
-  const [driverError, setDriverError] =
-    useState("");
-
+  const [driverError, setDriverError] = useState("");
   const [driverSuccess, setDriverSuccess] =
     useState("");
-
   const [
     isCreatingDriver,
     setIsCreatingDriver,
@@ -220,31 +210,18 @@ function App() {
   const [isAssigning, setIsAssigning] =
     useState(false);
 
-  // Create shipment
-  const [senderName, setSenderName] =
-    useState("");
-
+  // Shipment creation
+  const [senderName, setSenderName] = useState("");
   const [recipientName, setRecipientName] =
     useState("");
-
-  const [origin, setOrigin] =
-    useState("");
-
+  const [origin, setOrigin] = useState("");
   const [destination, setDestination] =
     useState("");
 
-  const [weightKg, setWeightKg] =
-    useState("1");
-
-  const [lengthCm, setLengthCm] =
-    useState("20");
-
-  const [widthCm, setWidthCm] =
-    useState("15");
-
-  const [heightCm, setHeightCm] =
-    useState("10");
-
+  const [weightKg, setWeightKg] = useState("1");
+  const [lengthCm, setLengthCm] = useState("20");
+  const [widthCm, setWidthCm] = useState("15");
+  const [heightCm, setHeightCm] = useState("10");
   const [serviceLevel, setServiceLevel] =
     useState("0");
 
@@ -253,16 +230,12 @@ function App() {
     setDeliveryInstructions,
   ] = useState("");
 
-  const [createError, setCreateError] =
-    useState("");
-
+  const [createError, setCreateError] = useState("");
   const [
     createdTrackingNumber,
     setCreatedTrackingNumber,
   ] = useState("");
-
-  const [isCreating, setIsCreating] =
-    useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   // Status update
   const [
@@ -270,39 +243,24 @@ function App() {
     setUpdateTrackingNumber,
   ] = useState("");
 
-  const [newStatus, setNewStatus] =
-    useState("1");
-
-  const [
-    updateLocation,
-    setUpdateLocation,
-  ] = useState("");
-
+  const [newStatus, setNewStatus] = useState("1");
+  const [updateLocation, setUpdateLocation] =
+    useState("");
   const [
     updateDescription,
     setUpdateDescription,
   ] = useState("");
 
-  const [updateError, setUpdateError] =
-    useState("");
-
+  const [updateError, setUpdateError] = useState("");
   const [updateSuccess, setUpdateSuccess] =
     useState("");
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  const [isUpdating, setIsUpdating] =
-    useState(false);
+  const roles = auth?.user.roles ?? [];
 
-  const roles =
-    auth?.user.roles ?? [];
-
-  const isAdmin =
-    roles.includes("Admin");
-
-  const isEmployee =
-    roles.includes("Employee");
-
-  const isDriver =
-    roles.includes("Driver");
+  const isAdmin = roles.includes("Admin");
+  const isEmployee = roles.includes("Employee");
+  const isDriver = roles.includes("Driver");
 
   const canManageShipments =
     isAdmin || isEmployee;
@@ -315,7 +273,9 @@ function App() {
       total: shipments.length,
 
       active: shipments.filter(
-        (item) => item.currentStatus !== 4
+        (item) =>
+          item.currentStatus !== 4 &&
+          item.currentStatus !== 11
       ).length,
 
       created: shipments.filter(
@@ -323,11 +283,19 @@ function App() {
       ).length,
 
       inTransit: shipments.filter(
-        (item) => item.currentStatus === 2
+        (item) =>
+          item.currentStatus === 1 ||
+          item.currentStatus === 2 ||
+          item.currentStatus === 5 ||
+          item.currentStatus === 6 ||
+          item.currentStatus === 7 ||
+          item.currentStatus === 9
       ).length,
 
       outForDelivery: shipments.filter(
-        (item) => item.currentStatus === 3
+        (item) =>
+          item.currentStatus === 3 ||
+          item.currentStatus === 8
       ).length,
 
       delivered: shipments.filter(
@@ -338,9 +306,7 @@ function App() {
 
   const filteredShipments = useMemo(() => {
     const searchValue =
-      dashboardSearch
-        .trim()
-        .toLowerCase();
+      dashboardSearch.trim().toLowerCase();
 
     return shipments.filter((item) => {
       const matchesStatus =
@@ -365,14 +331,11 @@ function App() {
         item.destination
           .toLowerCase()
           .includes(searchValue) ||
-        (
-          item.assignedDriverName ?? ""
-        )
+        (item.assignedDriverName ?? "")
           .toLowerCase()
           .includes(searchValue);
 
-      return matchesStatus &&
-        matchesSearch;
+      return matchesStatus && matchesSearch;
     });
   }, [
     shipments,
@@ -395,11 +358,7 @@ function App() {
     if (isDriver) {
       void loadDriverShipments();
     }
-  }, [
-    auth,
-    canManageShipments,
-    isDriver,
-  ]);
+  }, [auth, canManageShipments, isDriver]);
 
   function getAuthorizationHeaders():
     Record<string, string> {
@@ -408,50 +367,99 @@ function App() {
     }
 
     return {
-      Authorization:
-        `Bearer ${auth.token}`,
+      Authorization: `Bearer ${auth.token}`,
     };
   }
 
-  function getStatusName(
-    status: number
-  ): string {
-    return statusNames[status] ??
-      "Unknown";
+  function getStatusName(status: number): string {
+    return statusNames[status] ?? "Unknown";
   }
 
   function getServiceName(
     serviceLevelValue: number
   ): string {
     return (
-      serviceNames[
-        serviceLevelValue
-      ] ?? "Unknown"
+      serviceNames[serviceLevelValue] ??
+      "Unknown"
     );
   }
 
-  function getStatusClass(
-    status: number
+  function getSuggestedNextStatus(
+    currentStatus: number
   ): string {
+    switch (currentStatus) {
+      case 0:
+        return "1";
+
+      case 1:
+        return "5";
+
+      case 5:
+        return "6";
+
+      case 6:
+        return "2";
+
+      case 2:
+        return "7";
+
+      case 7:
+        return "3";
+
+      case 3:
+        return "4";
+
+      case 8:
+        return "3";
+
+      case 9:
+        return "2";
+
+      case 10:
+        return "11";
+
+      default:
+        return "1";
+    }
+  }
+
+  function getStatusClass(status: number): string {
     switch (status) {
       case 0:
         return "status-created";
 
       case 1:
+      case 5:
         return "status-received";
 
       case 2:
+      case 6:
+      case 7:
         return "status-transit";
 
       case 3:
+      case 8:
         return "status-delivery";
 
       case 4:
         return "status-delivered";
 
+      case 9:
+        return "status-delayed";
+
+      case 10:
+        return "status-damaged";
+
+      case 11:
+        return "status-cancelled";
+
       default:
         return "";
     }
+  }
+
+  function isFinalStatus(status: number): boolean {
+    return status === 4 || status === 11;
   }
 
   function selectShipmentForWork(
@@ -469,13 +477,10 @@ function App() {
       selectedShipment.trackingNumber
     );
 
-    if (
-      selectedShipment.currentStatus < 4
-    ) {
+    if (!isFinalStatus(selectedShipment.currentStatus)) {
       setNewStatus(
-        String(
-          selectedShipment.currentStatus +
-            1
+        getSuggestedNextStatus(
+          selectedShipment.currentStatus
         )
       );
     }
@@ -486,10 +491,7 @@ function App() {
   ): Promise<void> {
     event.preventDefault();
 
-    if (
-      !loginEmail.trim() ||
-      !loginPassword
-    ) {
+    if (!loginEmail.trim() || !loginPassword) {
       setLoginError(
         "Enter your email and password."
       );
@@ -507,8 +509,7 @@ function App() {
           method: "POST",
 
           headers: {
-            "Content-Type":
-              "application/json",
+            "Content-Type": "application/json",
           },
 
           body: JSON.stringify({
@@ -583,9 +584,7 @@ function App() {
       );
     }
 
-    return (
-      (await response.json()) as Shipment
-    );
+    return (await response.json()) as Shipment;
   }
 
   async function trackShipment(
@@ -609,9 +608,7 @@ function App() {
 
     try {
       const data =
-        await loadShipment(
-          cleanedTrackingNumber
-        );
+        await loadShipment(cleanedTrackingNumber);
 
       setShipment(data);
       selectShipmentForWork(data);
@@ -642,21 +639,13 @@ function App() {
         shipmentResponse,
         driverResponse,
       ] = await Promise.all([
-        fetch(
-          `${apiBaseUrl}/api/shipments`,
-          {
-            headers:
-              getAuthorizationHeaders(),
-          }
-        ),
+        fetch(`${apiBaseUrl}/api/shipments`, {
+          headers: getAuthorizationHeaders(),
+        }),
 
-        fetch(
-          `${apiBaseUrl}/api/drivers`,
-          {
-            headers:
-              getAuthorizationHeaders(),
-          }
-        ),
+        fetch(`${apiBaseUrl}/api/drivers`, {
+          headers: getAuthorizationHeaders(),
+        }),
       ]);
 
       if (!shipmentResponse.ok) {
@@ -709,8 +698,7 @@ function App() {
       const response = await fetch(
         `${apiBaseUrl}/api/drivers/my-shipments`,
         {
-          headers:
-            getAuthorizationHeaders(),
+          headers: getAuthorizationHeaders(),
         }
       );
 
@@ -772,9 +760,7 @@ function App() {
           selectedShipment.assignedDriverName,
       });
 
-      selectShipmentForWork(
-        selectedShipment
-      );
+      selectShipmentForWork(selectedShipment);
 
       window.scrollTo({
         top: 0,
@@ -807,9 +793,7 @@ function App() {
           method: "POST",
 
           headers: {
-            "Content-Type":
-              "application/json",
-
+            "Content-Type": "application/json",
             ...getAuthorizationHeaders(),
           },
 
@@ -879,15 +863,12 @@ function App() {
           method: "PUT",
 
           headers: {
-            "Content-Type":
-              "application/json",
-
+            "Content-Type": "application/json",
             ...getAuthorizationHeaders(),
           },
 
           body: JSON.stringify({
-            driverId:
-              Number(selectedDriverId),
+            driverId: Number(selectedDriverId),
           }),
         }
       );
@@ -941,8 +922,7 @@ function App() {
         )}/assignment`,
         {
           method: "DELETE",
-          headers:
-            getAuthorizationHeaders(),
+          headers: getAuthorizationHeaders(),
         }
       );
 
@@ -987,39 +967,22 @@ function App() {
           method: "POST",
 
           headers: {
-            "Content-Type":
-              "application/json",
-
+            "Content-Type": "application/json",
             ...getAuthorizationHeaders(),
           },
 
           body: JSON.stringify({
-            senderName:
-              senderName.trim(),
+            senderName: senderName.trim(),
+            recipientName: recipientName.trim(),
+            origin: origin.trim(),
+            destination: destination.trim(),
 
-            recipientName:
-              recipientName.trim(),
+            weightKg: Number(weightKg),
+            lengthCm: Number(lengthCm),
+            widthCm: Number(widthCm),
+            heightCm: Number(heightCm),
 
-            origin:
-              origin.trim(),
-
-            destination:
-              destination.trim(),
-
-            weightKg:
-              Number(weightKg),
-
-            lengthCm:
-              Number(lengthCm),
-
-            widthCm:
-              Number(widthCm),
-
-            heightCm:
-              Number(heightCm),
-
-            serviceLevel:
-              Number(serviceLevel),
+            serviceLevel: Number(serviceLevel),
 
             deliveryInstructions:
               deliveryInstructions.trim(),
@@ -1045,9 +1008,7 @@ function App() {
         createdShipment.trackingNumber
       );
 
-      selectShipmentForWork(
-        createdShipment
-      );
+      selectShipmentForWork(createdShipment);
 
       setSenderName("");
       setRecipientName("");
@@ -1095,19 +1056,13 @@ function App() {
           method: "PUT",
 
           headers: {
-            "Content-Type":
-              "application/json",
-
+            "Content-Type": "application/json",
             ...getAuthorizationHeaders(),
           },
 
           body: JSON.stringify({
-            status:
-              Number(newStatus),
-
-            location:
-              updateLocation.trim(),
-
+            status: Number(newStatus),
+            location: updateLocation.trim(),
             description:
               updateDescription.trim(),
           }),
@@ -1128,9 +1083,7 @@ function App() {
           cleanedTrackingNumber
         );
 
-      setShipment(
-        refreshedShipment
-      );
+      setShipment(refreshedShipment);
 
       setUpdateSuccess(
         `Shipment updated to ${getStatusName(
@@ -1139,12 +1092,13 @@ function App() {
       );
 
       if (
-        refreshedShipment.currentStatus < 4
+        !isFinalStatus(
+          refreshedShipment.currentStatus
+        )
       ) {
         setNewStatus(
-          String(
-            refreshedShipment.currentStatus +
-              1
+          getSuggestedNextStatus(
+            refreshedShipment.currentStatus
           )
         );
       }
@@ -1174,9 +1128,8 @@ function App() {
         <h1>Track your shipment</h1>
 
         <p className="subtitle">
-          Track packages, manage drivers,
-          assign deliveries, and update
-          shipment progress.
+          Track packages, manage drivers, assign
+          deliveries, and view complete delivery history.
         </p>
 
         <form
@@ -1187,9 +1140,7 @@ function App() {
             type="text"
             value={trackingNumber}
             onChange={(event) =>
-              setTrackingNumber(
-                event.target.value
-              )
+              setTrackingNumber(event.target.value)
             }
             placeholder="Example: PTR-A8B1388E99"
           />
@@ -1222,8 +1173,8 @@ function App() {
               <h2>Login</h2>
 
               <p>
-                Administrators, employees,
-                and drivers can sign in.
+                Administrators, employees, and drivers
+                can sign in.
               </p>
             </div>
 
@@ -1281,15 +1232,13 @@ function App() {
           <div className="signed-in-panel">
             <div>
               <strong>
-                Signed in as{" "}
-                {auth.user.fullName}
+                Signed in as {auth.user.fullName}
               </strong>
 
               <p>{auth.user.email}</p>
 
               <p>
-                Roles:{" "}
-                {auth.user.roles.join(", ")}
+                Roles: {auth.user.roles.join(", ")}
               </p>
             </div>
 
@@ -1304,8 +1253,7 @@ function App() {
       </section>
 
       {auth &&
-        (canManageShipments ||
-          isDriver) && (
+        (canManageShipments || isDriver) && (
           <section className="dashboard-section">
             <div className="dashboard-heading">
               <div>
@@ -1330,9 +1278,7 @@ function App() {
                 onClick={() =>
                   void refreshDashboard()
                 }
-                disabled={
-                  isLoadingDashboard
-                }
+                disabled={isLoadingDashboard}
               >
                 {isLoadingDashboard
                   ? "Refreshing..."
@@ -1356,14 +1302,14 @@ function App() {
               </article>
 
               <article className="stat-card">
-                <span>Created</span>
+                <span>Label created</span>
                 <strong>
                   {dashboardStats.created}
                 </strong>
               </article>
 
               <article className="stat-card">
-                <span>In transit</span>
+                <span>In network</span>
                 <strong>
                   {dashboardStats.inTransit}
                 </strong>
@@ -1371,7 +1317,7 @@ function App() {
 
               <article className="stat-card">
                 <span>
-                  Out for delivery
+                  Delivery activity
                 </span>
 
                 <strong>
@@ -1414,25 +1360,16 @@ function App() {
                   All statuses
                 </option>
 
-                <option value="0">
-                  Created
-                </option>
-
-                <option value="1">
-                  Package Received
-                </option>
-
-                <option value="2">
-                  In Transit
-                </option>
-
-                <option value="3">
-                  Out for Delivery
-                </option>
-
-                <option value="4">
-                  Delivered
-                </option>
+                {statusOptions.map(
+                  (statusOption) => (
+                    <option
+                      key={statusOption.value}
+                      value={statusOption.value}
+                    >
+                      {statusOption.label}
+                    </option>
+                  )
+                )}
               </select>
             </div>
 
@@ -1471,8 +1408,8 @@ function App() {
                         }
                         className="empty-table"
                       >
-                        No matching shipments
-                        were found.
+                        No matching shipments were
+                        found.
                       </td>
                     </tr>
                   ) : (
@@ -1481,22 +1418,17 @@ function App() {
                         <tr key={item.id}>
                           <td>
                             <strong>
-                              {
-                                item.trackingNumber
-                              }
+                              {item.trackingNumber}
                             </strong>
                           </td>
 
                           <td>
                             <div>
-                              {
-                                item.recipientName
-                              }
+                              {item.recipientName}
                             </div>
 
                             <small>
-                              From{" "}
-                              {item.senderName}
+                              From {item.senderName}
                             </small>
                           </td>
 
@@ -1506,8 +1438,7 @@ function App() {
                             </div>
 
                             <small>
-                              To{" "}
-                              {item.destination}
+                              To {item.destination}
                             </small>
                           </td>
 
@@ -1579,10 +1510,7 @@ function App() {
 
           <div className="shipment-grid">
             <div>
-              <p className="label">
-                Sender
-              </p>
-
+              <p className="label">Sender</p>
               <p>{shipment.senderName}</p>
             </div>
 
@@ -1590,17 +1518,11 @@ function App() {
               <p className="label">
                 Recipient
               </p>
-
-              <p>
-                {shipment.recipientName}
-              </p>
+              <p>{shipment.recipientName}</p>
             </div>
 
             <div>
-              <p className="label">
-                Origin
-              </p>
-
+              <p className="label">Origin</p>
               <p>{shipment.origin}</p>
             </div>
 
@@ -1608,17 +1530,11 @@ function App() {
               <p className="label">
                 Destination
               </p>
-
-              <p>
-                {shipment.destination}
-              </p>
+              <p>{shipment.destination}</p>
             </div>
 
             <div>
-              <p className="label">
-                Service
-              </p>
-
+              <p className="label">Service</p>
               <p>
                 {getServiceName(
                   shipment.serviceLevel
@@ -1627,9 +1543,7 @@ function App() {
             </div>
 
             <div>
-              <p className="label">
-                Package
-              </p>
+              <p className="label">Package</p>
 
               <p>
                 {shipment.weightKg} kg —{" "}
@@ -1698,8 +1612,7 @@ function App() {
             shipment.trackingHistory.length ===
               0 ? (
               <p>
-                No tracking events are
-                available.
+                No tracking events are available.
               </p>
             ) : (
               <div className="timeline">
@@ -1727,15 +1640,11 @@ function App() {
                         </div>
 
                         <p>
-                          {
-                            trackingEvent.location
-                          }
+                          {trackingEvent.location}
                         </p>
 
                         <small>
-                          {
-                            trackingEvent.description
-                          }
+                          {trackingEvent.description}
                         </small>
                       </div>
                     </article>
@@ -1754,13 +1663,11 @@ function App() {
               Driver Administration
             </p>
 
-            <h2>
-              Create a driver account
-            </h2>
+            <h2>Create a driver account</h2>
 
             <p>
-              Create login credentials for
-              a delivery driver.
+              Create login credentials for a delivery
+              driver.
             </p>
           </div>
 
@@ -1848,9 +1755,7 @@ function App() {
                 Driver Assignment
               </p>
 
-              <h2>
-                Assign a shipment
-              </h2>
+              <h2>Assign a shipment</h2>
             </div>
 
             <form
@@ -1945,9 +1850,7 @@ function App() {
                 Shipment Management
               </p>
 
-              <h2>
-                Create a new shipment
-              </h2>
+              <h2>Create a new shipment</h2>
             </div>
 
             <form
@@ -1991,9 +1894,7 @@ function App() {
                   type="text"
                   value={origin}
                   onChange={(event) =>
-                    setOrigin(
-                      event.target.value
-                    )
+                    setOrigin(event.target.value)
                   }
                   required
                 />
@@ -2143,14 +2044,11 @@ function App() {
             {createdTrackingNumber && (
               <div className="success-message">
                 <strong>
-                  Shipment created
-                  successfully
+                  Shipment created successfully
                 </strong>
 
                 <p>
-                  {
-                    createdTrackingNumber
-                  }
+                  {createdTrackingNumber}
                 </p>
               </div>
             )}
@@ -2168,10 +2066,32 @@ function App() {
                 : "Employee Tools"}
             </p>
 
-            <h2>
-              Update shipment status
-            </h2>
+            <h2>Update shipment status</h2>
+
+            <p>
+              The backend verifies that the selected
+              status transition is valid.
+            </p>
           </div>
+
+          {shipment &&
+            isFinalStatus(
+              shipment.currentStatus
+            ) && (
+              <div className="success-message">
+                <strong>
+                  {getStatusName(
+                    shipment.currentStatus
+                  )}{" "}
+                  is a final status.
+                </strong>
+
+                <p>
+                  This shipment cannot receive more
+                  updates.
+                </p>
+              </div>
+            )}
 
           <form
             className="form-grid"
@@ -2182,9 +2102,7 @@ function App() {
 
               <input
                 type="text"
-                value={
-                  updateTrackingNumber
-                }
+                value={updateTrackingNumber}
                 onChange={(event) =>
                   setUpdateTrackingNumber(
                     event.target.value
@@ -2205,21 +2123,19 @@ function App() {
                   )
                 }
               >
-                <option value="1">
-                  Package Received
-                </option>
-
-                <option value="2">
-                  In Transit
-                </option>
-
-                <option value="3">
-                  Out for Delivery
-                </option>
-
-                <option value="4">
-                  Delivered
-                </option>
+                {statusOptions
+                  .filter(
+                    (statusOption) =>
+                      statusOption.value !== 0
+                  )
+                  .map((statusOption) => (
+                    <option
+                      key={statusOption.value}
+                      value={statusOption.value}
+                    >
+                      {statusOption.label}
+                    </option>
+                  ))}
               </select>
             </label>
 
@@ -2255,7 +2171,15 @@ function App() {
 
             <button
               type="submit"
-              disabled={isUpdating}
+              disabled={
+                isUpdating ||
+                (shipment !== null &&
+                  shipment.trackingNumber ===
+                    updateTrackingNumber &&
+                  isFinalStatus(
+                    shipment.currentStatus
+                  ))
+              }
             >
               {isUpdating
                 ? "Updating..."
