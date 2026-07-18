@@ -1,13 +1,15 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PackageTracking.Api.Data;
+using PackageTracking.Api.Models;
 using PackageTracking.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Controllers
+// Add API controllers.
 builder.Services.AddControllers();
 
-// Database
+// Configure SQL Server.
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     var connectionString =
@@ -18,7 +20,27 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString);
 });
 
-// AfterShip service
+// Configure ASP.NET Core Identity.
+builder.Services
+    .AddIdentityCore<AppUser>(options =>
+    {
+        options.User.RequireUniqueEmail = true;
+
+        options.Password.RequiredLength = 8;
+        options.Password.RequireDigit = true;
+        options.Password.RequireLowercase = true;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireNonAlphanumeric = false;
+
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan =
+            TimeSpan.FromMinutes(10);
+    })
+    .AddRoles<IdentityRole<int>>()
+    .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddDefaultTokenProviders();
+
+// Configure the AfterShip service.
 builder.Services.AddHttpClient<AfterShipTrackingService>(client =>
 {
     var baseUrl = builder.Configuration["AfterShip:BaseUrl"];
@@ -32,7 +54,7 @@ builder.Services.AddHttpClient<AfterShipTrackingService>(client =>
     }
 });
 
-// Allow the React website to call the API
+// Allow the React frontend to access the API.
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
