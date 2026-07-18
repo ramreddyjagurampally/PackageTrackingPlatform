@@ -1,5 +1,11 @@
-#root {
-  min-height: 100vh;
+:root {
+  font-family:
+    Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  color: #172033;
+  background: #f4f6fa;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -8,197 +14,380 @@
 
 body {
   margin: 0;
-  background: #f4f7fb;
-  color: #172033;
-  font-family:
-    Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top, #e8efff 0, transparent 38%),
+    #f4f6fa;
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .page {
-  width: min(960px, calc(100% - 32px));
+  width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 72px 0;
+  padding: 40px 0 80px;
+}
+
+.hero,
+.account-section,
+.dashboard-section,
+.shipment-card,
+.management-section {
+  border: 1px solid #dfe5ef;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 16px 45px rgba(39, 56, 92, 0.08);
 }
 
 .hero {
+  padding: 52px;
   text-align: center;
 }
 
+.hero h1 {
+  margin: 8px 0 14px;
+  font-size: clamp(2.2rem, 5vw, 4rem);
+  line-height: 1.04;
+}
+
 .eyebrow {
-  margin: 0 0 8px;
-  color: #3157d5;
-  font-size: 0.85rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  margin: 0;
+  color: #3d63dd;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
 }
 
-h1 {
-  margin: 0;
-  font-size: clamp(2.3rem, 7vw, 4rem);
-  line-height: 1.05;
-}
-
 .subtitle {
-  max-width: 650px;
-  margin: 18px auto 32px;
-  color: #5d6678;
+  max-width: 680px;
+  margin: 0 auto 28px;
+  color: #667085;
+  font-size: 1.05rem;
   line-height: 1.7;
 }
 
 .tracking-form {
   display: flex;
-  max-width: 700px;
+  max-width: 720px;
   margin: 0 auto;
-  padding: 8px;
-  border: 1px solid #dbe1ec;
-  border-radius: 16px;
-  background: white;
-  box-shadow: 0 15px 40px rgb(31 43 75 / 10%);
+  gap: 12px;
 }
 
 .tracking-form input {
   flex: 1;
-  min-width: 0;
-  padding: 14px 16px;
-  border: 0;
-  outline: none;
-  background: transparent;
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #cfd7e6;
+  border-radius: 12px;
+  padding: 0 14px;
   color: #172033;
+  background: #fff;
+  outline: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
-.tracking-form input::placeholder {
-  color: #8a93a5;
+input:focus,
+select:focus {
+  border-color: #5271ff;
+  box-shadow: 0 0 0 4px rgba(82, 113, 255, 0.12);
 }
 
-.tracking-form button {
-  padding: 14px 22px;
+button {
+  min-height: 46px;
   border: 0;
-  border-radius: 11px;
-  background: #3157d5;
+  border-radius: 12px;
+  padding: 0 20px;
   color: white;
-  cursor: pointer;
+  background: #3659d9;
   font-weight: 700;
   transition:
-    background 0.2s ease,
-    transform 0.2s ease;
+    transform 150ms ease,
+    background 150ms ease;
 }
 
-.tracking-form button:hover:not(:disabled) {
-  background: #2448c2;
+button:hover:not(:disabled) {
+  background: #2948bb;
   transform: translateY(-1px);
 }
 
-.tracking-form button:disabled {
-  cursor: wait;
-  opacity: 0.7;
+.secondary-button,
+.table-button {
+  color: #2948bb;
+  background: #edf1ff;
 }
 
-.error-message {
-  margin-top: 18px;
-  color: #bd2525;
-  font-weight: 600;
+.secondary-button:hover:not(:disabled),
+.table-button:hover:not(:disabled) {
+  color: white;
+  background: #3659d9;
 }
 
+.account-section,
+.dashboard-section,
 .shipment-card {
-  margin-top: 48px;
+  margin-top: 24px;
   padding: 32px;
-  border: 1px solid #dfe5ef;
-  border-radius: 22px;
+}
+
+.section-heading h2,
+.dashboard-heading h2 {
+  margin: 7px 0 8px;
+  font-size: 1.75rem;
+}
+
+.section-heading p:last-child,
+.dashboard-heading p:last-child {
+  margin: 0;
+  color: #667085;
+  line-height: 1.6;
+}
+
+.signed-in-panel,
+.dashboard-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.signed-in-panel strong {
+  font-size: 1.1rem;
+}
+
+.signed-in-panel p {
+  margin: 5px 0 0;
+  color: #667085;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 26px;
+}
+
+.stat-card {
+  min-height: 116px;
+  border: 1px solid #e1e6f0;
+  border-radius: 16px;
+  padding: 19px;
+  background: linear-gradient(145deg, #ffffff, #f7f9fd);
+}
+
+.stat-card span {
+  display: block;
+  min-height: 38px;
+  color: #667085;
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.stat-card strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 2rem;
+}
+
+.dashboard-controls {
+  display: grid;
+  grid-template-columns: 1fr 240px;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.table-wrap {
+  margin-top: 20px;
+  overflow-x: auto;
+  border: 1px solid #e0e6f0;
+  border-radius: 16px;
+}
+
+.shipment-table {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
   background: white;
-  box-shadow: 0 20px 50px rgb(31 43 75 / 8%);
+}
+
+.shipment-table th,
+.shipment-table td {
+  padding: 17px 18px;
+  border-bottom: 1px solid #e8ecf3;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.shipment-table th {
+  color: #667085;
+  background: #f8f9fc;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.shipment-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.shipment-table tbody tr:hover {
+  background: #fafbff;
+}
+
+.shipment-table small {
+  color: #778195;
+}
+
+.table-status,
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 7px 11px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.status-created {
+  color: #5f4b00;
+  background: #fff4bd;
+}
+
+.status-received {
+  color: #174d78;
+  background: #dcefff;
+}
+
+.status-transit {
+  color: #443091;
+  background: #ece6ff;
+}
+
+.status-delivery {
+  color: #8b4200;
+  background: #ffe5cc;
+}
+
+.status-delivered {
+  color: #12613a;
+  background: #d9f7e7;
+}
+
+.table-button {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 0.85rem;
+}
+
+.empty-table {
+  padding: 36px !important;
+  color: #667085;
+  text-align: center !important;
 }
 
 .shipment-heading {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 20px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid #e6eaf1;
+  gap: 24px;
 }
 
 .shipment-heading h2 {
-  margin: 4px 0 0;
-  overflow-wrap: anywhere;
+  margin: 5px 0 0;
+  font-size: clamp(1.4rem, 3vw, 2rem);
 }
 
 .label {
   margin: 0;
-  color: #70798c;
-  font-size: 0.85rem;
-  font-weight: 700;
+  color: #7b8496;
+  font-size: 0.77rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-
-.status-badge {
-  flex-shrink: 0;
-  padding: 9px 14px;
-  border-radius: 999px;
-  background: #e7edff;
-  color: #2446b8;
-  font-weight: 700;
 }
 
 .shipment-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 26px;
-  padding: 28px 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 28px;
 }
 
-.shipment-grid p:not(.label) {
-  margin: 7px 0 0;
-  font-weight: 600;
+.shipment-grid > div {
+  border: 1px solid #e3e7ef;
+  border-radius: 14px;
+  padding: 17px;
+  background: #fafbfe;
+}
+
+.shipment-grid p:last-child {
+  margin: 8px 0 0;
+  font-weight: 650;
 }
 
 .history-section {
-  padding-top: 24px;
-  border-top: 1px solid #e6eaf1;
+  margin-top: 34px;
 }
 
 .history-section h3 {
-  margin: 0 0 12px;
+  margin: 0 0 20px;
+  font-size: 1.25rem;
 }
 
 .timeline {
   display: grid;
-  gap: 8px;
+  gap: 0;
 }
 
 .timeline-item {
   position: relative;
   display: grid;
-  grid-template-columns: 18px 1fr;
-  gap: 16px;
-  padding: 14px 0;
+  grid-template-columns: 24px 1fr;
+  gap: 13px;
+  min-height: 98px;
 }
 
 .timeline-item:not(:last-child)::before {
   position: absolute;
-  top: 31px;
-  bottom: -13px;
-  left: 5px;
+  top: 18px;
+  bottom: -4px;
+  left: 6px;
   width: 2px;
-  background: #dbe3f6;
+  background: #dce3ef;
   content: "";
 }
 
 .timeline-dot {
   position: relative;
   z-index: 1;
-  width: 12px;
-  height: 12px;
-  margin-top: 5px;
-  border: 3px solid #3157d5;
+  width: 14px;
+  height: 14px;
+  margin-top: 4px;
+  border: 3px solid white;
   border-radius: 50%;
-  background: white;
+  background: #3d63dd;
+  box-shadow: 0 0 0 2px #3d63dd;
 }
 
 .timeline-heading {
@@ -208,125 +397,60 @@ h1 {
 }
 
 .timeline-heading time {
-  color: #70798c;
-  font-size: 0.86rem;
+  color: #7c8595;
+  font-size: 0.83rem;
 }
 
 .timeline-item p {
-  margin: 7px 0;
+  margin: 7px 0 4px;
 }
 
 .timeline-item small {
-  color: #70798c;
-  line-height: 1.5;
+  color: #667085;
+  line-height: 1.55;
 }
 
-@media (max-width: 650px) {
-  .page {
-    padding: 40px 0;
-  }
-
-  .tracking-form {
-    display: grid;
-  }
-
-  .tracking-form input {
-    width: 100%;
-  }
-
-  .tracking-form button {
-    width: 100%;
-  }
-
-  .shipment-card {
-    padding: 22px;
-  }
-
-  .shipment-heading,
-  .timeline-heading {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .shipment-grid {
-    grid-template-columns: 1fr;
-  }
-}
-.create-section {
-  margin-top: 48px;
-  padding: 32px;
-  border: 1px solid #dfe5ef;
-  border-radius: 22px;
-  background: white;
-  box-shadow: 0 20px 50px rgb(31 43 75 / 8%);
-}
-
-.section-heading {
-  margin-bottom: 28px;
-  text-align: center;
-}
-
-.section-heading h2 {
-  margin: 8px 0;
-  font-size: 2rem;
-}
-
-.section-heading > p:last-child {
-  color: #70798c;
-}
-
-.create-form {
+.management-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 24px;
 }
 
-.create-form label {
+.management-section {
+  padding: 30px;
+}
+
+.form-grid {
+  display: grid;
+  gap: 17px;
+  margin-top: 24px;
+}
+
+.form-grid label {
   display: grid;
   gap: 8px;
-  color: #3b4558;
+  color: #344054;
+  font-size: 0.9rem;
   font-weight: 700;
 }
 
-.create-form input {
-  width: 100%;
-  padding: 14px;
-  border: 1px solid #d4dae5;
-  border-radius: 10px;
-  outline: none;
-  background: white;
-  color: #172033;
-}
-
-.create-form input:focus {
-  border-color: #3157d5;
-  box-shadow: 0 0 0 3px rgb(49 87 213 / 12%);
-}
-
-.create-form button {
-  grid-column: 1 / -1;
-  padding: 15px;
-  border: 0;
-  border-radius: 11px;
-  background: #3157d5;
-  color: white;
-  cursor: pointer;
-  font-weight: 700;
-}
-
-.create-form button:disabled {
-  cursor: wait;
-  opacity: 0.7;
+.error-message {
+  margin: 16px 0 0;
+  border: 1px solid #f5b9b9;
+  border-radius: 12px;
+  padding: 13px 15px;
+  color: #a31919;
+  background: #fff0f0;
 }
 
 .success-message {
-  margin-top: 24px;
-  padding: 20px;
-  border: 1px solid #b8dfc6;
-  border-radius: 12px;
-  background: #edf9f1;
-  color: #176c39;
-  text-align: center;
+  margin-top: 17px;
+  border: 1px solid #a8e1c1;
+  border-radius: 14px;
+  padding: 16px;
+  color: #145f39;
+  background: #ebfbf2;
 }
 
 .success-message p {
@@ -334,21 +458,56 @@ h1 {
 }
 
 .success-message code {
-  display: inline-block;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: white;
-  color: #172033;
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 800;
 }
 
-@media (max-width: 650px) {
-  .create-section {
-    padding: 22px;
+@media (max-width: 1050px) {
+  .stats-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .create-form {
+  .shipment-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .page {
+    width: min(100% - 20px, 1180px);
+    padding-top: 18px;
+  }
+
+  .hero,
+  .account-section,
+  .dashboard-section,
+  .shipment-card,
+  .management-section {
+    padding: 22px;
+    border-radius: 17px;
+  }
+
+  .tracking-form,
+  .signed-in-panel,
+  .dashboard-heading,
+  .timeline-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tracking-form {
+    display: grid;
+  }
+
+  .stats-grid,
+  .shipment-grid,
+  .management-grid,
+  .dashboard-controls {
     grid-template-columns: 1fr;
+  }
+
+  .timeline-heading {
+    display: flex;
+    gap: 4px;
   }
 }
