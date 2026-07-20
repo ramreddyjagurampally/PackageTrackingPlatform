@@ -6,8 +6,14 @@ using Microsoft.IdentityModel.Tokens;
 using PackageTracking.Api.Data;
 using PackageTracking.Api.Models;
 using PackageTracking.Api.Services;
+using QuestPDF.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure the QuestPDF license.
+// Use Community only when your project qualifies for that license.
+QuestPDF.Settings.License =
+    LicenseType.Community;
 
 // Load local development secrets.
 builder.Configuration.AddUserSecrets<Program>(
@@ -110,8 +116,12 @@ builder.Services
 // Configure role-based authorization.
 builder.Services.AddAuthorization();
 
-// Register the shared shipping-rate engine.
+// Phase 6B: shared shipping-rate engine.
 builder.Services.AddScoped<ShippingRateService>();
+
+// Phase 6C: barcode and PDF shipping-label services.
+builder.Services.AddScoped<BarcodeService>();
+builder.Services.AddScoped<ShippingLabelService>();
 
 // Configure AfterShip service.
 builder.Services.AddHttpClient<AfterShipTrackingService>(
