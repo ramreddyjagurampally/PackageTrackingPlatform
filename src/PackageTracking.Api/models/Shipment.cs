@@ -6,33 +6,43 @@ namespace PackageTracking.Api.Models;
 
 public sealed class Shipment
 {
-    public Guid Id { get; set; } =
-        Guid.NewGuid();
+    public Guid Id { get; set; } = Guid.NewGuid();
 
     [Required]
     [MaxLength(30)]
-    public string TrackingNumber { get; set; } =
-        string.Empty;
+    public string TrackingNumber { get; set; } = string.Empty;
 
     [Required]
     [MaxLength(150)]
-    public string SenderName { get; set; } =
-        string.Empty;
+    public string SenderName { get; set; } = string.Empty;
 
     [Required]
     [MaxLength(150)]
-    public string RecipientName { get; set; } =
-        string.Empty;
+    public string RecipientName { get; set; } = string.Empty;
+
+    // Existing summary fields are temporarily retained so that
+    // current shipments and frontend pages continue to work.
+    [Required]
+    [MaxLength(200)]
+    public string Origin { get; set; } = string.Empty;
 
     [Required]
     [MaxLength(200)]
-    public string Origin { get; set; } =
-        string.Empty;
+    public string Destination { get; set; } = string.Empty;
 
-    [Required]
-    [MaxLength(200)]
-    public string Destination { get; set; } =
-        string.Empty;
+    // Complete sender address.
+    // Nullable during the migration so existing shipments do not break.
+    public int? SenderAddressId { get; set; }
+
+    [JsonIgnore]
+    public Address? SenderAddress { get; set; }
+
+    // Complete recipient address.
+    // Nullable during the migration so existing shipments do not break.
+    public int? RecipientAddressId { get; set; }
+
+    [JsonIgnore]
+    public Address? RecipientAddress { get; set; }
 
     public ShipmentStatus CurrentStatus { get; set; } =
         ShipmentStatus.Created;

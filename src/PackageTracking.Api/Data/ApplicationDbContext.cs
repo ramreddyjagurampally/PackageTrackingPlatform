@@ -20,6 +20,9 @@ public sealed class ApplicationDbContext
     public DbSet<ShipmentTrackingEvent> ShipmentTrackingEvents =>
         Set<ShipmentTrackingEvent>();
 
+    public DbSet<Address> Addresses =>
+        Set<Address>();
+
     protected override void OnModelCreating(
         ModelBuilder builder)
     {
@@ -49,15 +52,35 @@ public sealed class ApplicationDbContext
             .Property(shipment => shipment.ShippingCost)
             .HasPrecision(18, 2);
 
+        // Tracking-history relationship.
+        // Deleting a shipment also deletes its tracking events.
         builder.Entity<ShipmentTrackingEvent>()
             .HasOne(trackingEvent => trackingEvent.Shipment)
             .WithMany(shipment => shipment.TrackingHistory)
             .HasForeignKey(trackingEvent => trackingEvent.ShipmentId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // Sender-address relationship.
+        // Restrict prevents an address from being deleted while
+        // it is connected to a shipment.
+        builder.Entity<Shipment>()
+            .HasOne(shipment => shipment.SenderAddress)
+            .WithMany()
+            .HasForeignKey(shipment => shipment.SenderAddressId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Recipient-address relationship.
+        // Restrict prevents an address from being deleted while
+        // it is connected to a shipment.
+        builder.Entity<Shipment>()
+            .HasOne(shipment => shipment.RecipientAddress)
+            .WithMany()
+            .HasForeignKey(shipment => shipment.RecipientAddressId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Driver relationship.
-        // When a driver is deleted, the shipment remains
-        // and its AssignedDriverId becomes null.
+        // When a driver is deleted, the shipment remains and
+        // AssignedDriverId becomes null.
         builder.Entity<Shipment>()
             .HasOne(shipment => shipment.AssignedDriver)
             .WithMany(driver => driver.AssignedShipments)
