@@ -20,14 +20,10 @@ public sealed class ApplicationDbContext
     public DbSet<ShipmentTrackingEvent> ShipmentTrackingEvents =>
         Set<ShipmentTrackingEvent>();
 
-    protected override void OnModelCreating(ModelBuilder builder)
+    protected override void OnModelCreating(
+        ModelBuilder builder)
     {
         base.OnModelCreating(builder);
-
-        builder.Entity<AppUser>()
-            .Property(user => user.FullName)
-            .HasMaxLength(150)
-            .IsRequired();
 
         builder.Entity<Shipment>()
             .HasIndex(shipment => shipment.TrackingNumber)
@@ -35,32 +31,45 @@ public sealed class ApplicationDbContext
 
         builder.Entity<Shipment>()
             .Property(shipment => shipment.WeightKg)
-            .HasPrecision(10, 2);
+            .HasPrecision(18, 2);
 
         builder.Entity<Shipment>()
             .Property(shipment => shipment.LengthCm)
-            .HasPrecision(10, 2);
+            .HasPrecision(18, 2);
 
         builder.Entity<Shipment>()
             .Property(shipment => shipment.WidthCm)
-            .HasPrecision(10, 2);
+            .HasPrecision(18, 2);
 
         builder.Entity<Shipment>()
             .Property(shipment => shipment.HeightCm)
-            .HasPrecision(10, 2);
+            .HasPrecision(18, 2);
 
         builder.Entity<Shipment>()
             .Property(shipment => shipment.ShippingCost)
-            .HasPrecision(10, 2);
+            .HasPrecision(18, 2);
 
-        builder.Entity<Shipment>()
-            .Property(shipment => shipment.DeliveryInstructions)
-            .HasMaxLength(500);
+        builder.Entity<ShipmentTrackingEvent>()
+            .HasOne(trackingEvent => trackingEvent.Shipment)
+            .WithMany(shipment => shipment.TrackingHistory)
+            .HasForeignKey(trackingEvent => trackingEvent.ShipmentId)
+            .OnDelete(DeleteBehavior.Cascade);
 
+        // Driver relationship.
+        // When a driver is deleted, the shipment remains
+        // and its AssignedDriverId becomes null.
         builder.Entity<Shipment>()
             .HasOne(shipment => shipment.AssignedDriver)
             .WithMany(driver => driver.AssignedShipments)
             .HasForeignKey(shipment => shipment.AssignedDriverId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // Customer relationship.
+        // NoAction prevents SQL Server multiple cascade paths.
+        builder.Entity<Shipment>()
+            .HasOne(shipment => shipment.Customer)
+            .WithMany(customer => customer.CustomerShipments)
+            .HasForeignKey(shipment => shipment.CustomerId)
+            .OnDelete(DeleteBehavior.NoAction);
     }
 }

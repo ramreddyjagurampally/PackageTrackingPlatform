@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using PackageTracking.Api.Models;
 
 namespace PackageTracking.Api.Dtos;
@@ -12,11 +12,6 @@ public sealed class CreateShipmentRequest
     [Required]
     [MaxLength(150)]
     public string RecipientName { get; set; } = string.Empty;
-
-    [Required]
-    [EmailAddress]
-    [MaxLength(256)]
-    public string CustomerEmail { get; set; } = string.Empty;
 
     [Required]
     [MaxLength(250)]
@@ -50,5 +45,3 @@ public sealed class CreateShipmentRequest
     [MaxLength(150)]
     public string? CarrierTrackingNumber { get; set; }
 }
-
-

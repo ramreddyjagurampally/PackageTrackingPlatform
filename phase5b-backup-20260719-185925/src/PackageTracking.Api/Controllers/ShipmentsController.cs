@@ -1,7 +1,6 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PackageTracking.Api.Data;
@@ -17,17 +16,14 @@ namespace PackageTracking.Api.Controllers;
 public sealed class ShipmentsController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
-    private readonly UserManager<AppUser> _userManager;
     private readonly AfterShipTrackingService _afterShipTrackingService;
 
     public ShipmentsController(
         ApplicationDbContext dbContext,
-        AfterShipTrackingService afterShipTrackingService,
-        UserManager<AppUser> userManager)
+        AfterShipTrackingService afterShipTrackingService)
     {
         _dbContext = dbContext;
         _afterShipTrackingService = afterShipTrackingService;
-        _userManager = userManager;
     }
 
     // Employees and administrators can view every shipment.
@@ -116,40 +112,6 @@ public sealed class ShipmentsController : ControllerBase
         var destination =
             request.Destination?.Trim() ??
             string.Empty;
-        var customerEmail =
-            request.CustomerEmail?.Trim().ToLowerInvariant()
-            ?? string.Empty;
-
-        if (string.IsNullOrWhiteSpace(customerEmail))
-        {
-            return BadRequest(new
-            {
-                message = "A customer email is required."
-            });
-        }
-
-        var customer =
-            await _userManager.FindByEmailAsync(customerEmail);
-
-        if (customer is null)
-        {
-            return BadRequest(new
-            {
-                message =
-                    "No registered customer account was found with that email."
-            });
-        }
-
-        if (!await _userManager.IsInRoleAsync(
-                customer,
-                "Customer"))
-        {
-            return BadRequest(new
-            {
-                message =
-                    "The selected account does not have the Customer role."
-            });
-        }
 
         if (string.IsNullOrWhiteSpace(senderName) ||
             string.IsNullOrWhiteSpace(recipientName) ||
@@ -218,9 +180,6 @@ public sealed class ShipmentsController : ControllerBase
 
             RecipientName =
                 recipientName,
-            CustomerId = customer.Id,
-            CustomerName = customer.FullName,
-            CustomerEmail = customer.Email ?? customerEmail,
 
             Origin =
                 origin,
@@ -820,49 +779,8 @@ public sealed class ShipmentsController : ControllerBase
                 status.ToString()
         };
     }
-    // Customer Portal:
-    // Return only shipments belonging to the logged-in customer.
-    // GET /api/shipments/my
-    [HttpGet("my")]
-    [Authorize(Roles = "Customer")]
-    public async Task<ActionResult<IEnumerable<Shipment>>>
-        GetMyCustomerShipments()
-    {
-        var customerId = GetCurrentUserId();
 
-        if (!customerId.HasValue)
-        {
-            return Unauthorized(new
-            {
-                message =
-                    "The customer account could not be identified."
-            });
-        }
-
-        var shipments = await _dbContext.Shipments
-            .AsNoTracking()
-            .Include(shipment =>
-                shipment.TrackingHistory)
-            .Where(shipment =>
-                shipment.CustomerId ==
-                customerId.Value)
-            .OrderByDescending(shipment =>
-                shipment.CreatedAtUtc)
-            .ToListAsync();
-
-        foreach (var shipment in shipments)
-        {
-            shipment.TrackingHistory =
-                shipment.TrackingHistory
-                    .OrderByDescending(trackingEvent =>
-                        trackingEvent.OccurredAtUtc)
-                    .ToList();
-        }
-
-        return Ok(shipments);
-    }
-
-private int? GetCurrentUserId()
+    private int? GetCurrentUserId()
     {
         var userIdValue =
             User.FindFirstValue(

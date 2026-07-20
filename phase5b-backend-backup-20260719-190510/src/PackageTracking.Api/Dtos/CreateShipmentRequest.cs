@@ -51,4 +51,3 @@ public sealed class CreateShipmentRequest
     public string? CarrierTrackingNumber { get; set; }
 }
 
-

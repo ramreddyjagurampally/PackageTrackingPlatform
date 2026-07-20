@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
@@ -5,25 +6,40 @@ namespace PackageTracking.Api.Models;
 
 public sealed class Shipment
 {
-    public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid Id { get; set; } =
+        Guid.NewGuid();
 
-    public string TrackingNumber { get; init; } = string.Empty;
+    [Required]
+    [MaxLength(30)]
+    public string TrackingNumber { get; set; } =
+        string.Empty;
 
-    public string SenderName { get; set; } = string.Empty;
+    [Required]
+    [MaxLength(150)]
+    public string SenderName { get; set; } =
+        string.Empty;
 
-    public string RecipientName { get; set; } = string.Empty;
+    [Required]
+    [MaxLength(150)]
+    public string RecipientName { get; set; } =
+        string.Empty;
 
-    public string Origin { get; set; } = string.Empty;
+    [Required]
+    [MaxLength(200)]
+    public string Origin { get; set; } =
+        string.Empty;
 
-    public string Destination { get; set; } = string.Empty;
+    [Required]
+    [MaxLength(200)]
+    public string Destination { get; set; } =
+        string.Empty;
 
     public ShipmentStatus CurrentStatus { get; set; } =
         ShipmentStatus.Created;
 
-    public DateTime CreatedAtUtc { get; init; } =
+    public DateTime CreatedAtUtc { get; set; } =
         DateTime.UtcNow;
 
-    // Package information
     public decimal WeightKg { get; set; }
 
     public decimal LengthCm { get; set; }
@@ -39,25 +55,38 @@ public sealed class Shipment
 
     public decimal ShippingCost { get; set; }
 
+    [MaxLength(500)]
     public string DeliveryInstructions { get; set; } =
         string.Empty;
 
-    // Driver assignment
+    [MaxLength(100)]
+    public string? CarrierSlug { get; set; }
+
+    [MaxLength(100)]
+    public string? CarrierTrackingNumber { get; set; }
+
+    public bool UsesCarrierTracking { get; set; }
+
+    // Driver assigned to deliver this shipment.
     public int? AssignedDriverId { get; set; }
 
     [JsonIgnore]
     public AppUser? AssignedDriver { get; set; }
 
-    // Display-only value. This is not saved as a database column.
     [NotMapped]
     public string? AssignedDriverName { get; set; }
 
-    // External carrier information
-    public string? CarrierSlug { get; set; }
+    // Customer who owns this shipment.
+    public int? CustomerId { get; set; }
 
-    public string? CarrierTrackingNumber { get; set; }
+    [JsonIgnore]
+    public AppUser? Customer { get; set; }
 
-    public bool UsesCarrierTracking { get; set; }
+    [NotMapped]
+    public string? CustomerName { get; set; }
+
+    [NotMapped]
+    public string? CustomerEmail { get; set; }
 
     public ICollection<ShipmentTrackingEvent> TrackingHistory { get; set; } =
         new List<ShipmentTrackingEvent>();

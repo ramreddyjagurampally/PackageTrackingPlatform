@@ -214,7 +214,6 @@ function App() {
   const [senderName, setSenderName] = useState("");
   const [recipientName, setRecipientName] =
     useState("");
-  const [customerEmail, setCustomerEmail] = useState("");
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] =
     useState("");
@@ -262,7 +261,6 @@ function App() {
   const isAdmin = roles.includes("Admin");
   const isEmployee = roles.includes("Employee");
   const isDriver = roles.includes("Driver");
-  const isCustomer = roles.includes("Customer");
 
   const canManageShipments =
     isAdmin || isEmployee;
@@ -728,44 +726,6 @@ function App() {
     }
   }
 
-  async function loadCustomerShipments() {
-    setIsLoadingDashboard(true);
-    setDashboardError("");
-
-    try {
-      const response = await fetch(
-        `${apiBaseUrl}/api/shipments/my`,
-        {
-        headers: {
-  Authorization: `Bearer ${auth?.token ?? ""}`,
-},
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          await readErrorMessage(
-            response,
-            "Your shipments could not be loaded."
-          )
-        );
-      }
-
-      const customerShipments =
-        (await response.json()) as Shipment[];
-
-      setShipments(customerShipments);
-    } catch (error) {
-      setDashboardError(
-        error instanceof Error
-          ? error.message
-          : "Your shipments could not be loaded."
-      );
-    } finally {
-      setIsLoadingDashboard(false);
-    }
-  }
-
   async function refreshDashboard():
     Promise<void> {
     if (canManageShipments) {
@@ -1014,7 +974,6 @@ function App() {
           body: JSON.stringify({
             senderName: senderName.trim(),
             recipientName: recipientName.trim(),
-            customerEmail: customerEmail.trim(),
             origin: origin.trim(),
             destination: destination.trim(),
 
@@ -1053,7 +1012,6 @@ function App() {
 
       setSenderName("");
       setRecipientName("");
-      setCustomerEmail("");
       setOrigin("");
       setDestination("");
 
@@ -1159,19 +1117,6 @@ function App() {
       setIsUpdating(false);
     }
   }
-
-  // Customer portal automatic loading.
-  useEffect(() => {
-    if (
-      auth &&
-      isCustomer &&
-      !canManageShipments &&
-      !isDriver
-    ) {
-      void loadCustomerShipments();
-    }
-  }, [auth]);
-
 
   return (
     <main className="page">
@@ -1308,30 +1253,22 @@ function App() {
       </section>
 
       {auth &&
-        (canManageShipments || isDriver || isCustomer) && (
+        (canManageShipments || isDriver) && (
           <section className="dashboard-section">
             <div className="dashboard-heading">
               <div>
                 <p className="eyebrow">
-                  {isCustomer &&
-                  !canManageShipments &&
-                  !isDriver
-                    ? "Customer Portal"
-                    : isDriver &&
-                      !canManageShipments
-                      ? "Driver Dashboard"
-                      : "Operations Dashboard"}
+                  {isDriver &&
+                  !canManageShipments
+                    ? "Driver Dashboard"
+                    : "Operations Dashboard"}
                 </p>
 
                 <h2>
-                  {isCustomer &&
-                  !canManageShipments &&
-                  !isDriver
-                    ? "My shipments"
-                    : isDriver &&
-                      !canManageShipments
-                      ? "My assigned shipments"
-                      : "Shipment overview"}
+                  {isDriver &&
+                  !canManageShipments
+                    ? "My assigned shipments"
+                    : "Shipment overview"}
                 </h2>
               </div>
 
@@ -1339,13 +1276,7 @@ function App() {
                 type="button"
                 className="secondary-button"
                 onClick={() =>
-                  void (
-                    isCustomer &&
-                    !canManageShipments &&
-                    !isDriver
-                      ? loadCustomerShipments()
-                      : refreshDashboard()
-                  )
+                  void refreshDashboard()
                 }
                 disabled={isLoadingDashboard}
               >
@@ -1414,13 +1345,7 @@ function App() {
                     event.target.value
                   )
                 }
-                placeholder={
-                  isCustomer &&
-                  !canManageShipments &&
-                  !isDriver
-                    ? "Search my shipments"
-                    : "Search shipment, customer, location, or driver"
-                }
+                placeholder="Search shipment, customer, location, or driver"
               />
 
               <select
@@ -1961,22 +1886,6 @@ function App() {
                   required
                 />
               </label>
-              <label>
-                Customer account email
-
-                <input
-                  type="email"
-                  value={customerEmail}
-                  onChange={(event) =>
-                    setCustomerEmail(
-                      event.target.value
-                    )
-                  }
-                  placeholder="johncustomer@example.com"
-                  required
-                />
-              </label>
-
 
               <label>
                 Origin
